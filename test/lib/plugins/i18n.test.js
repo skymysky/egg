@@ -1,5 +1,4 @@
 'use strict';
-
 const utils = require('../../utils');
 
 describe('test/lib/plugins/i18n.test.js', () => {
@@ -15,7 +14,7 @@ describe('test/lib/plugins/i18n.test.js', () => {
       return app.httpRequest()
         .get('/message?locale=de')
         .expect(200)
-        .expect('Set-Cookie', /locale=de; path=\/; expires=[^;]+ GMT/)
+        .expect('Set-Cookie', /locale=de; path=\/; max-age=\d+; expires=[^;]+ GMT/)
         .expect({
           message: 'Hallo fengmk2, wie geht es dir heute? Wie war dein 18.',
           empty: '',
@@ -36,8 +35,8 @@ describe('test/lib/plugins/i18n.test.js', () => {
       return app.httpRequest()
         .get('/')
         .expect(200)
-        .expect('Set-Cookie', /locale=en-us; path=\/; expires=[^;]+ GMT/)
-        .expect('<li>Email: </li>\n<li>Hello fengmk2, how are you today?</li>\n<li>foo bar</li>\n');
+        .expect('Set-Cookie', /locale=en-us; path=\/; max-age=\d+; expires=[^;]+ GMT/)
+        .expect(/^<li>Email: <\/li>\r?\n<li>Hello fengmk2, how are you today\?<\/li>\r?\n<li>foo bar<\/li>\r?\n$/);
     });
 
     it('should render with query locale: zh_CN', () => {
@@ -45,8 +44,8 @@ describe('test/lib/plugins/i18n.test.js', () => {
         .get('/?locale=zh_CN')
         .set('Host', 'foo.example.com')
         .expect(200)
-        .expect('Set-Cookie', /locale=zh-cn; path=\/; expires=[^;]+ GMT/)
-        .expect('<li>邮箱: </li>\n<li>fengmk2，今天过得如何？</li>\n<li>foo bar</li>\n');
+        .expect('Set-Cookie', /locale=zh-cn; path=\/; max-age=\d+; expires=[^;]+ GMT/)
+        .expect(/^<li>邮箱: <\/li>\r?\n<li>fengmk2，今天过得如何？<\/li>\r?\n<li>foo bar<\/li>\r?\n$/);
     });
   });
 });

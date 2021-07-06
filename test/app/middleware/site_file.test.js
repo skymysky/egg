@@ -14,23 +14,21 @@ describe('test/app/middleware/site_file.test.js', () => {
   it('should GET /favicon.ico 200', () => {
     return app.httpRequest()
       .get('/favicon.ico')
-      .expect('Content-Type', 'image/x-icon')
-      // .expect(res => console.log(res.headers))
+      .expect(res => assert(res.headers['content-type'].includes('icon')))
       .expect(200);
   });
 
   it('should GET /favicon.ico?t=123 200', () => {
     return app.httpRequest()
       .get('/favicon.ico?t=123')
-      .expect('Content-Type', 'image/x-icon')
-      // .expect(res => console.log(res.headers))
+      .expect(res => assert(res.headers['content-type'].includes('icon')))
       .expect(200);
   });
 
   it('should 200 when accessing /robots.txt', () => {
     return app.httpRequest()
       .get('/robots.txt')
-      .expect('User-agent: Baiduspider\nDisallow: /\n\nUser-agent: baiduspider\nDisallow: /')
+      .expect(/^User-agent: Baiduspider\r?\nDisallow: \/\r?\n\r?\nUser-agent: baiduspider\r?\nDisallow: \/$/)
       .expect(200);
   });
 
@@ -44,7 +42,7 @@ describe('test/app/middleware/site_file.test.js', () => {
   it('should support HEAD', () => {
     return app.httpRequest()
       .head('/robots.txt')
-      .expect('content-length', '72')
+      .expect(res => assert(Number(res.header['content-length']) > 0))
       // body must be empty for HEAD
       .expect(res => assert.equal(res.text, undefined))
       .expect(200);

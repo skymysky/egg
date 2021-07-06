@@ -32,7 +32,7 @@ class UserController extends Controller {
 ```
 This simplest Router is done by now, when users do the request `GET /user/123`, the info function in `user.js` will be invoked.
 
-## Router config in detail
+## Router Config in Detail
 
 Below is the complete definition of router, parameters can be determined depending on different scenes.
 
@@ -82,9 +82,9 @@ module.exports = app => {
 };
 ```
 
-### RESTful style URL definition
+### RESTful Style URL Definition
 
-We provide `app.resources('routerName', 'pathMatch', 'controller')` to generate [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) structures on a path for convenience if you prefer the RESTful style URL definition.
+We provide `app.router.resources('routerName', 'pathMatch', 'controller')` to generate [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) structures on a path for convenience if you prefer the RESTful style URL definition.
 
 ```js
 // app/router.js
@@ -132,7 +132,7 @@ More practical examples will be shown below to demonstrate how to use the router
 
 #### Acquiring Parameters
 
-#### via Query String
+#### Via Query String
 
 ```js
 // app/router.js
@@ -148,7 +148,7 @@ exports.index = async ctx => {
 // curl http://127.0.0.1:7001/search?name=egg
 ```
 
-#### via Named Parameters
+#### Via Named Parameters
 
 ```js
 // app/router.js
@@ -164,7 +164,7 @@ exports.info = async ctx => {
 // curl http://127.0.0.1:7001/user/123/xiaoming
 ```
 
-#### acquiring complex parameters
+#### Acquiring Complex Parameters
 
 Regular expressions, as well, can be used in routing rules to acquire parameters more flexibly:
 
@@ -310,7 +310,7 @@ module.exports = () => {
 
 // app/router.js
 module.exports = app => {
-  app.router.get('s', '/search', app.middlewares.uppercase(), app.controller.search)
+  app.router.get('s', '/search', app.middleware.uppercase(), app.controller.search)
 };
 
 // curl http://localhost:7001/search?name=egg

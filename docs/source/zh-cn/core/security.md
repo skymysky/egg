@@ -256,7 +256,7 @@ CSRF 攻击会对网站发起恶意伪造的请求，严重影响网站的安全
 通常来说，对于 CSRF 攻击有一些通用的[防范方案](https://www.owasp.org/index.php/Cross-Site_Request_Forgery_%28CSRF%29_Prevention_Cheat_Sheet#CSRF_Specific_Defense)，简单的介绍几种常用的防范方案：
 
 - Synchronizer Tokens：通过响应页面时将 token 渲染到页面上，在 form 表单提交的时候通过隐藏域提交上来。
-- Double Cookie Defense：将 token 设置在 Cookie 中，在提交 post 请求的时候提交 Cookie，并通过 header 或者 body 带上 Cookie 中的 token，服务端进行对比校验。
+- Double Cookie Defense：将 token 设置在 Cookie 中，在提交（POST、PUT、PATCH、DELETE 等）请求时提交 Cookie，并通过 header 或者 body 带上 Cookie 中的 token，服务端进行对比校验。
 - Custom Header：信任带有特定的 header（例如 `X-Requested-With: XMLHttpRequest`）的请求。这个方案可以被绕过，所以 rails 和 django 等框架都[放弃了该防范方式](https://www.djangoproject.com/weblog/2011/feb/08/security/)。
 
 框架结合了上述几种防范方式，提供了一个可配置的 CSRF 防范策略。
@@ -585,7 +585,7 @@ HTTP 是网络应用广泛使用的协议，负责 Web 内容的请求和获取�
 
 对于 HTTPS 来讲，还有一点要注意的是 HTTP 严格传输安全（HSTS），如果不使用 HSTS，当用户在浏览器中输入网址时没有加 HTTPS，浏览器会默认使用 HTTP 访问
 
-框架提供了 `hsts Strict-Transport-Security` 这个头的默认开启。让 HTTPS 站点不跳转到 HTTP，如果站点支持 HTTPS，请一定要开启。
+框架默认关闭了 `hsts Strict-Transport-Security`。使得 HTTPS 站点不跳转到 HTTP，如果站点支持 HTTPS，请一定要开启。
 
 如果我们的Web 站点是 http 站点，需要关闭这个头。配置如下：
 
@@ -650,7 +650,7 @@ exports.security = {
 
 ### app.injectHijackingDefense(str)
 
-对于没有开启 HTTPS 的网站，这个函数可以有限的防止运营商劫持。
+对于没有开启 HTTPS 的网站，这个函数可以有效的防止运营商劫持。
 
 
 [egg-view-nunjucks]: https://github.com/eggjs/egg-view-nunjucks

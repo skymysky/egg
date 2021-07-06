@@ -1,10 +1,11 @@
-## Title: View Plugin Development
+title: View Plugin Development
+---
 
-In most cases, we need to read the data, render the template and then present it to the user. The framework does not force the use of a template engine, allowing developers to select the [template](../core/view.md) themselves. For details, see [Template Rendering](../core/view.md).
+In most cases, we need to read the data, render the template and then present it to the user. The framework does not force to use one template engine, but allows developers to select the [template](../core/view.md) by themselves. For details, see [Template Rendering](../core/view.md).
 
-This article describes the framework's specification constraints on the View plugin, and we can use this to encapsulate the corresponding template engine plugin. The following takes [egg-view-ejs] as an example
+This article describes the framework's specification constraints on the View plugin, and we can use this to encapsulate the corresponding template engine plugin. The following takes [egg-view-ejs] as an example.
 
-## Plugin directory structure
+## Plugin Directory Structure
 
 ```bash
 egg-view-ejs
@@ -20,7 +21,7 @@ egg-view-ejs
 └── package.json
 ```
 
-## Plugin naming convention
+## Plugin Naming Convention
 
 * Follow the [plugin development specification](./plugin.md)
 * According to the convention, the names of plugins start with `egg-view-`
@@ -45,7 +46,7 @@ module.exports = {
 };
 ```
 
-## View base class
+## View Base Class
 
 The next step is to provide a View base class that will be instantiated on each request.
 
@@ -83,23 +84,23 @@ Mmdule.exports = class EjsView {
 
 ### Parameters
 
-The three parameters of the `render` method are
+The three parameters of the `render` method are:
 
-* filename: is the path to the complete file. The framework determines if the file exists when it looks for the file. It does not need to be processed here.
-* locals: The data needed for rendering. The data comes from `app.locals`, `ctx.locals` and calls `render` methods. The framework also has built in `ctx`, `request`, `ctx.helper` objects.
+* filename: is the path to the complete file. The framework determines if the file exists when looking for the file. It does not need to be processed here.
+* locals: The data needs rendering. It comes from `app.locals`, `ctx.locals` and calls `render` methods. The framework also has built in `ctx`, `request`, `ctx.helper` objects.
 * viewOptions: The incoming configuration of the user, which can override the default configuration of the template engine. This can be considered based on the characteristics of the template engine. For example, the cache is enabled by default but a page does not need to be cached.
 
-The three parameters of the `renderString` method
+The three parameters of the `renderString` method:
 
-* tpl: template string, not file path
-* locals: same with `render`
-* viewOptions: same with `render`
+* tpl: template string, not file path.
+* locals: same with `render`.
+* viewOptions: same with `render`.
 
-## Plugin configuration
+## Plugin Configuration
 
-According to the naming conventions mentioned above, the configuration name is generally the name of the template engine, such as ejs
+According to the naming conventions mentioned above, the configuration name is generally the name of the template engine, such as ejs.
 
-The configuration of the plugin mainly comes from the configuration of the template engine, and the configuration items can be defined according to the specific conditions, such as the [configuration of ejs](https://github.com/mde/ejs#options)
+The configuration of the plugin mainly comes from the configuration of the template engine, and the configuration items can be defined according to the specific conditions, such as the [configuration of ejs](https://github.com/mde/ejs#options).
 
 ```js
 // config/config.default.js
@@ -120,11 +121,11 @@ In template rendering, we often need to output a user-supplied html fragment, in
 <div>{{ helper.shtml(data.content) | safe }}</div>
 ```
 
-However, as shown in the above code, we need to use `| safe` to tell the template engine that the html is safe and it doesn't need to run `escape` again.
+However, as shown in the code above, we need to use `| safe` to tell the template engine that the html is safe and it doesn't need to run `escape` again.
 
 This is more cumbersome to use and easy to forget, so we can package it:
 
-First provide a helper subclass:
+- First provide a helper subclass:
 
 ```js
 // {plugin_root}/lib/helper.js
@@ -139,7 +140,7 @@ module.exports = app => {
 };
 ```
 
-Use a custom helper when rendering
+- Use a custom helper when rendering:
 
 ```js
 // {plugin_root}/lib/view.js
@@ -158,7 +159,7 @@ You can [view](https://github.com/eggjs/egg-view-nunjucks/blob/2ee5ee992cfd95bc0
 
 Templates and security are related and [egg-security] also provides some methods for the template. The template engine can be used according to requirements.
 
-First declare a dependency on [egg-security]
+First declare a dependency on [egg-security]:
 
 ```json
 {
@@ -170,11 +171,11 @@ First declare a dependency on [egg-security]
 }
 ```
 
-The framework provides [app.injectCsrf](../core/security.md#appinjectcsrfstr) and [app.injectNonce](../core/security.md#appinjectnonncestr), for more information on [security section](../core/security.md).
+Besides, the framework provides [app.injectCsrf](../core/security.md#appinjectcsrfstr) and [app.injectNonce](../core/security.md#appinjectnonncestr), for more information on [security section](../core/security.md).
 
-### Unit tests
+### Unit Tests
 
-As a high-quality plugin, perfect unit testing is indispensable, and we also provide a lot of auxiliary tools to make it painless for plugin developers to write tests, see [unit testing](../core/unittest.md) and [plugin](./plugin.md) docs.
+As a high-quality plugin, perfect unit testing is indispensable, and we also provide lots of auxiliary tools to make it painless for plugin developers to write tests with, see [unit testing](../core/unittest.md) and [plugin](./plugin.md) docs.
 
 [egg-security]: https://github.com/eggjs/egg-security
 [egg-view-nunjucks]: https://github.com/eggjs/egg-view-nunjucks

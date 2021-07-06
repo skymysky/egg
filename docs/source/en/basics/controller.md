@@ -1,4 +1,4 @@
-title: controller
+title: Controller
 ---
 
 ## What is Controller
@@ -200,7 +200,7 @@ The remaining part is the actual content of this response.
 
 It can be seen from the above HTTP request examples that there are many places can be used to put user's request data. The framework provides many convenient methods and attributes by binding the Context instance to Controllers to acquire parameters sent by users through HTTP request.
 
-### query
+### `query`
 
 Usually the Query String, string following `?` in the URL, is used to send parameters by request of GET type. For example, `category=egg&language=node` in `GET /posts?category=egg&language=node` is the parameter that user sends. We can acquire this parsed parameter body through `ctx.query`:
 
@@ -229,7 +229,7 @@ if (key.startsWith('egg')) {
 
 Or if someone passes parameters with same keys in Query String on purpose, system error may be thrown. To avoid this, the framework guarantee that the parameter must be a string type whenever it is acquired from `ctx.query`.
 
-#### queries
+#### `queries`
 
 Sometimes our system is designed to accept same keys sent by users, like `GET /posts?category=egg&id=1&id=2&id=3`. For this situation, the framework provides `ctx.queries` object to parse Query String and put duplicated data into an array:
 
@@ -248,7 +248,7 @@ class PostController extends Controller {
 
 All key on the `ctx.queries` will be an array type if it has a value.
 
-### Router params
+### Router Params
 
 In [Router](./router.md) part, we say Router is allowed to declare parameters which can be acquired by `ctx.params`.
 
@@ -263,7 +263,7 @@ class AppController extends Controller {
 }
 ```
 
-### body
+### `body`
 
 Although we can pass parameters through URL, but constraints exist:
 
@@ -310,19 +310,115 @@ If user request exceeds the maximum length for parsing that we configured, the f
 
 **A common mistake is to confuse `ctx.request.body` and `ctx.body`(which is alias for `ctx.response.body`).**
 
-### Acquire Uploaded Files
+### Acquiring the Submitted Files
 
-Request body not only can take parameters, but also send files. and browsers usually send file in `Multipart/form-data` type. The uploaded files can be acquired by the framework built-in plugin [Multipart](https://github.com/eggjs/egg-multipart).
+The `body` in the request can carry parameters as well as files. Generally speaking, our browsers always send files in `multipart/form-data`, and we now have two kinds of ways supporting submitting and acquiring files with the help of the framework's plugin [Multipart](https://github.com/eggjs/egg-multipart).
 
-For full example, see [eggjs/examples/multipart](https://github.com/eggjs/examples/tree/master/multipart).
+- #### `File` Mode:
+If you have no ideas about Nodejs's Stream at all, the `File` mode suits you well:
 
-In Controller, we can acquire the file stream of the uploaded file through interface `ctx.getFileStream()`.
+1) In your config file, enable `file` mode first:
+```js
+// config/config.default.js
+exports.multipart = {
+  mode: 'file',
+};
+```
+
+2) Submitting / Acquiring Files:
+
+1. For Single File:
+
+Your HTML static front-end codes should look like this below:
+```html
+<form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
+  title: <input name="title" />
+  file: <input name="file" type="file" />
+  <button type="submit">Upload</button>
+</form>
+```
+The corresponding backend codes are:
+```js
+// app/controller/upload.js
+const Controller = require('egg').Controller;
+const fs = require('mz/fs');
+
+module.exports = class extends Controller {
+  async upload() {
+    const { ctx } = this;
+    const file = ctx.request.files[0];
+    const name = 'egg-multipart-test/' + path.basename(file.filename);
+    let result;
+    try {
+      // process file (e.g: upload to cloud storage)
+      result = await ctx.oss.put(name, file.filepath);
+    } finally {
+      // need to remove the tmp file
+      await fs.unlink(file.filepath);
+    }
+
+    ctx.body = {
+      url: result.url,
+      // get all field values
+      requestBody: ctx.request.body,
+    };
+  }
+};
+```
+
+2. For Multiple Files:
+
+For multiple files, with the help of `ctx.request.files`, we can loop each of them and do what process we like:
+
+Your HTML static front-end codes should look like this below:
+```html
+<form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
+  title: <input name="title" />
+  file1: <input name="file1" type="file" />
+  file2: <input name="file2" type="file" />
+  <button type="submit">Upload</button>
+</form>
+```
+The corresponding backend codes are:
+```js
+// app/controller/upload.js
+const Controller = require('egg').Controller;
+const fs = require('mz/fs');
+
+module.exports = class extends Controller {
+  async upload() {
+    const { ctx } = this;
+    console.log(ctx.request.body);
+    console.log('got %d files', ctx.request.files.length);
+    for (const file of ctx.request.files) {
+      console.log('field: ' + file.fieldname);
+      console.log('filename: ' + file.filename);
+      console.log('encoding: ' + file.encoding);
+      console.log('mime: ' + file.mime);
+      console.log('tmp filepath: ' + file.filepath);
+      let result;
+      try {
+        // process file (e.g: upload to cloud storage)
+        result = await ctx.oss.put('egg-multipart-test/' + file.filename, file.filepath);
+      } finally {
+        // need to remove the tmp file
+        await fs.unlink(file.filepath);
+      }
+      console.log(result);
+    }
+  }
+};
+```
+- #### `Stream` Mode
+If you are very familiar with `Stream` in Nodejs, you can choose this way. In a controller, we can fetch the uploaded files through `ctx.getFileStream()`.
+
+1. For Single File：
 
 ```html
 <form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
   title: <input name="title" />
   file: <input name="file" type="file" />
-  <button type="submit">上传</button>
+  <button type="submit">Upload</button>
 </form>
 ```
 
@@ -336,33 +432,35 @@ class UploaderController extends Controller {
     const ctx = this.ctx;
     const stream = await ctx.getFileStream();
     const name = 'egg-multipart-test/' + path.basename(stream.filename);
-    // file processing, e.g. uploading to the cloud storage etc.
     let result;
     try {
+      // process file (e.g: upload to cloud storage)
       result = await ctx.oss.put(name, stream);
     } catch (err) {
-      // must consume the file stream, or the browser will get stuck
+      // You MUST consume the file stream, otherwises the browser cannot response any more
       await sendToWormhole(stream);
       throw err;
     }
 
     ctx.body = {
       url: result.url,
-      // all form fields can be acquired by `stream.fields`
+      // All the fields in the form can be fetched through `stream.fields`
       fields: stream.fields,
     };
   }
-};
+}
 
 module.exports = UploaderController;
 ```
 
-To acquire user uploaded files conveniently by `ctx.getFileStream`, two conditions must be matched:
+To acquire the uploaded files easily, there're two conditions at least:
 
-- only one file can be uploaded at the same time.
-- file uploading must appear after other fields, otherwise we may can't access fields when we got file stream.
+- Only ONE file per time.
+- The field of uploading file MUST be after the other fields in a form, otherwise you cannot get other fields after getting the file stream.
 
-If more than one files are to be uploaded at the same time, `ctx.getFileStream()` is no longer the way but the following:
+2. For Multiple Files:
+
+For multiple files, you should do the following instead of using `ctx.getFileStream()`:
 
 ```js
 const sendToWormhole = require('stream-wormhole');
@@ -376,28 +474,30 @@ class UploaderController extends Controller {
     // parts() return a promise
     while ((part = await parts()) != null) {
       if (part.length) {
-        // it is field in case of arrays
+        // arrays are busboy fields
         console.log('field: ' + part[0]);
         console.log('value: ' + part[1]);
         console.log('valueTruncated: ' + part[2]);
         console.log('fieldnameTruncated: ' + part[3]);
       } else {
         if (!part.filename) {
-          // it occurs when user clicks on the upload without selecting the ile(part represents file, while part.filename is empty)
-          // more process should be taken, like giving an error message
+          // When a user clicks `upload` before choosing a file,
+          // `part` will be file stream, but `part.filename` is empty.
+          // We must handler this by notifying the user that he/she should
+          // choose a file before submitting
           return;
         }
-        // part represents the file stream uploaded
+        // otherwise, it's a fully-filled stream
         console.log('field: ' + part.fieldname);
         console.log('filename: ' + part.filename);
         console.log('encoding: ' + part.encoding);
         console.log('mime: ' + part.mime);
-        // file processing, e.g. uploading to the cloud storage etc.
         let result;
         try {
+          // process file (e.g: upload to cloud storage)
           result = await ctx.oss.put('egg-multipart-test/' + part.filename, part);
         } catch (err) {
-          // must consume the file stream, or the browser will get stuck
+          // You MUST consume the file stream, otherwises the browser cannot response any more
           await sendToWormhole(part);
           throw err;
         }
@@ -406,12 +506,12 @@ class UploaderController extends Controller {
     }
     console.log('and we are done parsing the form!');
   }
-};
+}
 
 module.exports = UploaderController;
 ```
 
-To ensure the security of uploading files, the framework limits the formats of supported file and the whitelist supported by default is below:
+The framework also has the limits for the safety of uploading files, the default white list is:
 
 ```js
 // images
@@ -439,31 +539,33 @@ To ensure the security of uploading files, the framework limits the formats of s
 '.avi',
 ```
 
-New file extensions can be added by configuring the `config/config.default.js` file or rewriting the whole whitelist.
+Users can add new file extensions in `config/config.default.js`, or rewrite a whole white list:
 
-- add new file extensions
-
-```js
-module.exports = {
-  multipart: {
-    fileExtensions: [ '.apk' ], // supports .apk file extension
-  },
-};
-```
-
-- overwrite the whole whitelist
+- Newly-added a file extension:
 
 ```js
 module.exports = {
   multipart: {
-    whitelist: [ '.png' ], // overwrite the whole whitelist, only '.png' is allowed to be uploaded
+    fileExtensions: [ '.apk' ], // Add support for apk files
   },
 };
 ```
 
-**Note: when the whitelist attribute is used, the fileExtensions attribute will be discarded.**
+- Overwriting a whole white list:
 
-### header
+```js
+module.exports = {
+  multipart: {
+    whitelist: [ '.png' ] // ONLY files of png is allowed
+  },
+};
+```
+
+**Notice：`fileExtensions` will be IGNORED when `whitelist` is overwritten.**
+
+For more tech details about this, please refer [Egg-Multipart](https://github.com/eggjs/egg-multipart).
+
+### `header`
 
 Apart from URL and request body, some parameters can be sent by request header. The framework provides some helper attributes and methods to retrieve them.
 
@@ -511,7 +613,7 @@ Through `ctx.cookies`, we can conveniently and safely set and get Cookie in Cont
 class CookieController extends Controller {
   async add() {
     const ctx = this.ctx;
-    const count = ctx.cookies.get('count');
+    let count = ctx.cookies.get('count');
     count = count ? Number(count) : 0;
     ctx.cookies.set('count', ++count);
     ctx.body = count;
@@ -528,6 +630,29 @@ class CookieController extends Controller {
 Although Cookie is only a header in HTTP, multiple key-value pairs can be set in the format of `foo=bar;foo1=bar1;`.
 
 In Web applications, Cookie is usually used to send the identity information of the client, so it has many safety related configurations which can not be ignored, [Cookie](../core/cookie-and-session.md#cookie) explains the usage and safety related configurations of Cookie in detail and is worth being read in depth.
+
+#### Configuration
+
+There are mainly these attributes below can be used to configure default Cookie options in `config.default.js`:
+
+```js
+module.exports = {
+  cookies: {
+    // httpOnly: true | false,
+    // sameSite: 'none|lax|strict',
+  },
+};
+```
+
+e.g.: Configured application level Cookie [SameSite](https://www.ruanyifeng.com/blog/2019/09/cookie-samesite.html) property to `Lax`.
+
+```js
+module.exports = {
+  cookies: {
+    sameSite: 'lax',
+  },
+};
+```
 
 ### Session
 
@@ -625,7 +750,7 @@ class PostController extends Controller {
 
 The parameter validation is done by [Parameter](https://github.com/node-modules/parameter#rule), and all supported validation rules can be found in its document.
 
-#### Customizing validation rules
+#### Customizing Validation Rules
 
 In addition to built-in validation types introduced in the previous section, sometimes we hope to customize several validation rules to make the development more convenient and now customized rules can be added through `app.validator.addRule(type, check)`.
 
@@ -696,7 +821,7 @@ class PostController extends Controller {
 
 As to which status code should be used for a specific case, please refer to status code meanings on [List of HTTP status codes](https://en.wikipedia.org/wiki/List_of_HTTP_status_codes)
 
-### Setting Body
+### Body Setting
 
 Most data is sent to requesters through the body and, just like the body in the request, the body sent by the response demands a set of corresponding Content-Type to inform clients how to parse data.
 
@@ -840,7 +965,7 @@ module.exports = {
 
 When the CSRF validation is enabled, the client should bring CSRF token as well when it sends a JSONP request, if the page where the JSONP sender belongs to shares the same domain with our services, CSRF token in Cookie can be read(CSRF can be set manually if it is absent), and is brought together with the request.
 
-##### referrer Validation
+##### Validation Reference
 
 The CSRF way can be used for JSONP request validation only if the main domains are the same, while providing JSONP services for pages in different domains, we can limit JSONP senders into a controllable rang by configuring the referrer whitelist.
 
@@ -901,7 +1026,7 @@ exports.jsonp = {
 
 **If both CSRF and referrer validation are enabled, the request sender passes any one of them passes the JSONP security validation.**
 
-### Setting Header
+### Header Setting
 
 We identify whether the request is successful or not by using the status code and set response content in the body. By setting the response header, extended information can be set as well.
 

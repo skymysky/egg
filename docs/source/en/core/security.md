@@ -20,13 +20,13 @@ The framework itself has a rich solution for common security risks on the Web si
 - customizable white list for safe redirect and url filtering.
 - all kinds of template related tools for preprocessing.
 
-Security plug-ins [egg-security](https://github.com/eggjs/egg-security) are built into the framework, provides default security practices.
+Security plugins [egg-security](https://github.com/eggjs/egg-security) are built into the framework, provides default security practices.
 
-### Open or close the configuration
+### Open or Close the Configuration
 
-Note: it is not recommended to turn off the functions provided by the security plug-ins unless the consequences are clearly confirmed.
+Note: it is not recommended to turn off the functions provided by the security plugins unless the consequences are clearly confirmed.
 
-The security plug-in for the framework opens by default, if we want to close some security protection, directly set the `enable` attribute to false. For example, close xframe precautions:
+The security plugin for the framework opens by default, if we want to close some security protection, directly set the `enable` attribute to false. For example, close xframe precautions:
 
 
 ```js
@@ -37,7 +37,7 @@ exports.security = {
 };
 ```
 
-### match and ignore
+### `match` and `ignore`
 
 Match and ignore methods and formats are the same with[middleware general configuration](../basics/middleware.md#match%20and%20ignore).
 
@@ -84,7 +84,7 @@ exports.security = {
 
 We'll look at specific scenarios to illustrate how to use the security scenarios provided by the framework for Web security precautions.
 
-## Prevention of security threat `XSS`
+## Prevention of Security Threat `XSS`
 
 [XSS](https://www.owasp.org/index.php/Cross-site_Scripting_(XSS))（cross-site scripting）is the most common Web attack, which focus on "cross-domain" and "client-side execution."
 
@@ -224,7 +224,7 @@ Configration:
 * callback - default is `_callback`, you can rename
 * limit - callback function name length limit, default is 50.
 
-### Other XSS precautions
+### Other XSS Precautions
 
 Browser itself has some protection against all kinds of attacks, they generally take effect by opening the Web security headers. The framework has built-in support for some common Web security headers.
 
@@ -262,7 +262,7 @@ In general, there are some common [precautions](https://www.owasp.org/index.php/
 
 - Synchronizer Tokens：When the response page is rendered, token is rendered in the page, which will be submitted through a hidden input when a form is submitted.
 
-- Double Cookie Defense：The token will be stored in client Cookie, Cookie will be submitted when you submit a post request, then you can get the token, and submit the token through header or body, service side will compare and check it.
+- Double Cookie Defense：The token will be stored in client Cookie, Cookie will be submitted when you submit a POST/PUT/PATCH/DELETE request, then you can get the token, and submit the token through header or body, service side will compare and check it.
 
 - Custom Header：Trust request with specific header（like `X-Requested-With: XMLHttpRequest`）. This can be bypassed, so frameworks like rails and django [give up the guard](https://www.djangoproject.com/weblog/2011/feb/08/security/).
 
@@ -296,7 +296,7 @@ module.exports = {
 };
 ```
 
-In order to prevent the [BREACH attack](http://breachattack.com/), CSRF token rendered on the page will be changed everytime request changed, and the view plug-in, such as `egg-view-nunjucks`, will automatically inject the hidden field in Form without any perception of the application developer.
+In order to prevent the [BREACH attack](http://breachattack.com/), CSRF token rendered on the page will be changed everytime request changed, and the view plugin, such as `egg-view-nunjucks`, will automatically inject the hidden field in Form without any perception of the application developer.
 
 ##### AJAX Request
 
@@ -350,7 +350,7 @@ module.exports = {
 };
 ```
 
-#### Ignore JSON request(deprecated)
+#### Ignore JSON Request(deprecated)
 
 **Notice: this configure is deprecated, the attacker can bypass it through [flash and 307](https://www.geekboy.ninja/blog/exploiting-json-cross-site-request-forgery-csrf-using-flash/), please don't enable it in production environment!**
 
@@ -526,7 +526,7 @@ Framework provides `.surl()` macro to do url filtering.It is Used to parse the u
 
 You can add `helper.surl($value)` in the template to output variable.
 
-**note: in places where you need to parse the url, you must add double quotes outside of surl, or you will result in XSS vulnerabilities.**
+**Note: in places where you need to parse the url, you must add double quotes outside of surl, or you will result in XSS vulnerabilities.**
 
 Do not use `surl`
 
@@ -560,7 +560,7 @@ Framework provides `X-Frame-Options` this security header to prevent iframe Phis
 
 This configuration can be turned off when you need to embed some trusted third-party web pages.
 
-## Prevention of Security threats `HPP`
+## Prevention of Security Threats `HPP`
 
 HTTP protocol allows the parameters of the same name appears many times, due to the implementation of the application is not standard, the attacker from the distribution of parameters of transmission key and the value of different parameters, will cause to bypass the consequences of some protection.
 
@@ -594,7 +594,7 @@ So, if you use the Egg framework to develop web site developers, please be sure 
 
 For HTTPS, one should pay attention to is the HTTP transport security (HSTS) strictly, if you don't use HSTS, when a user input url in the browser without HTTPS, the browser will use HTTP access by default.
 
-Framework provides `HSTS Strict-Transport-security`, this header will be opened by default, then let the HTTPS site not redirect to HTTP. If your site supports HTTPS, be sure to open it.If our Web site is an HTTP site, we need to close this header.
+Framework has disableb `HSTS Strict-Transport-security` by default, then make the HTTPS site not redirect to HTTP. If your site supports HTTPS, be sure to open it.If our Web site is an HTTP site, we need to close this header.
 
 The configuration is as follows:
 
@@ -642,7 +642,7 @@ exports.security = {
 };
 ```
 
-## Other build-in security tools
+## Other Build-in Security Tools
 
 ### ctx.isSafeDomain(domain)
 

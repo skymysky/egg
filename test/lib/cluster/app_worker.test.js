@@ -1,8 +1,10 @@
 'use strict';
 
+const net = require('net');
 const request = require('supertest');
 const address = require('address');
-const assert = require('assert');
+const assert = require('assert-extends');
+const sleep = require('mz-modules/sleep');
 const utils = require('../../utils');
 
 const DEFAULT_BAD_REQUEST_HTML = `<html>
@@ -62,13 +64,37 @@ describe('test/lib/cluster/app_worker.test.js', () => {
     ]);
   });
 
-  describe('customized client error', () => {
+  describe('server timeout', () => {
     let app;
-    before(() => {
-      app = utils.cluster('apps/app-server-customized-client-error');
+    beforeEach(() => {
+      app = utils.cluster('apps/app-server-timeout');
+      // app.debug();
       return app.ready();
     });
-    after(() => app.close());
+    afterEach(() => app.close());
+
+    it('should not timeout', () => {
+      return app.httpRequest()
+        .get('/')
+        .expect(200);
+    });
+
+    it('should timeout', async () => {
+      await assert.asyncThrows(() => {
+        return app.httpRequest().get('/timeout');
+      }, /socket hang up/);
+      app.expect('stdout', /\[http_server] A request `GET \/timeout` timeout with client/);
+    });
+  });
+
+  describe('customized client error', () => {
+    let app;
+    beforeEach(() => {
+      app = utils.cluster('apps/app-server-customized-client-error');
+      app.debug();
+      return app.ready();
+    });
+    afterEach(() => app.close());
 
     it('should do customized request when HTTP request packet broken', async () => {
       const version = process.version.split('.').map(a => parseInt(a.replace('v', '')));
@@ -84,12 +110,22 @@ describe('test/lib/cluster/app_worker.test.js', () => {
       // customized client error response
       const test1 = app.httpRequest().get('/foo bar');
       test1.request().path = '/foo bar';
-      await test1.expect(html).expect('foo', 'bar').expect(418);
+      await test1.expect(html)
+        .expect('foo', 'bar')
+        .expect('content-length', '134')
+        .expect(418);
 
       // customized client error handle function throws
       const test2 = app.httpRequest().get('/foo bar');
       test2.request().path = '/foo bar';
       await test2.expect(DEFAULT_BAD_REQUEST_HTML).expect(400);
+    });
+
+    it('should not log when there is no rawPacket', async () => {
+      await connect(app.port);
+      await sleep(1000);
+      app.expect('stderr', /HPE_INVALID_EOF_STATE/);
+      app.notExpect('stderr', /A client/);
     });
   });
 
@@ -121,3 +157,14 @@ describe('test/lib/cluster/app_worker.test.js', () => {
     });
   });
 });
+
+function connect(port) {
+  return new Promise(resolve => {
+    const socket = net.createConnection(port, '127.0.0.1', () => {
+      socket.write('GET http://127.0.0.1:8080/ HTTP', () => {
+        socket.destroy();
+        resolve();
+      });
+    });
+  });
+}

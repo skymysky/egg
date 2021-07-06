@@ -1,9 +1,22 @@
-import * as accepts from 'accepts';
-import * as KoaApplication from 'koa';
-import * as KoaRouter from 'koa-router';
-import { RequestOptions } from 'urllib';
+/// <reference types="node" />
+import accepts = require('accepts');
+import KoaApplication = require('koa');
+import KoaRouter = require('koa-router');
+import { EventEmitter } from 'events'
 import { Readable } from 'stream';
 import { Socket } from 'net';
+import { IncomingMessage, ServerResponse } from 'http';
+import { EggLogger as Logger, EggLoggers, LoggerLevel as EggLoggerLevel, EggLoggersOptions, EggLoggerOptions, EggContextLogger } from 'egg-logger';
+import { HttpClient, RequestOptions2 as RequestOptions } from 'urllib';
+import {
+  EggCoreBase,
+  FileLoaderOption,
+  EggLoader as CoreLoader,
+  EggCoreOptions as CoreOptions,
+  EggLoaderOptions as CoreLoaderOptions,
+  BaseContextClass as CoreBaseContextClass,
+} from 'egg-core';
+import EggCookies = require('egg-cookies');
 import 'egg-onerror';
 import 'egg-session';
 import 'egg-i18n';
@@ -18,48 +31,59 @@ import 'egg-jsonp';
 import 'egg-view';
 
 declare module 'egg' {
+  export type EggLogger = Logger;
   // plain object
   type PlainObject<T = any> = { [key: string]: T };
+
+  // Remove specific property from the specific class
+  type RemoveSpecProp<T, P> = Pick<T, Exclude<keyof T, P>>;
+
+  export interface EggHttpClient extends HttpClient<RequestOptions> { }
+  interface EggHttpConstructor {
+    new(app: Application): EggHttpClient;
+  }
+
+  export interface EggContextHttpClient extends HttpClient<RequestOptions> { }
+  interface EggContextHttpClientConstructor {
+    new(ctx: Context): EggContextHttpClient;
+  }
 
   /**
    * BaseContextClass is a base class that can be extended,
    * it's instantiated in context level,
    * {@link Helper}, {@link Service} is extending it.
    */
-  export class BaseContextClass { // tslint:disable-line
-    /**
-     * request context
-     */
-    ctx: Context;
-
-    /**
-     * Application
-     */
-    app: Application;
-
-    /**
-     * Application config object
-     */
-    config: EggAppConfig;
-
-    /**
-     * service
-     */
-    service: IService;
-
+  export class BaseContextClass extends CoreBaseContextClass<Context, Application, EggAppConfig, IService> { // tslint:disable-line
     /**
      * logger
      */
-    logger: Logger;
-
-    constructor(ctx: Context);
+    protected logger: EggLogger;
   }
 
-  export interface Logger {
-    info(msg: any, ...args: any[]): void;
-    warn(msg: any, ...args: any[]): void;
-    debug(msg: any, ...args: any[]): void;
-    error(msg: any, ...args: any[]): void;
+  export class Boot {
+    /**
+     * logger
+     * @member {EggLogger}
+     */
+    protected logger: EggLogger;
+
+    /**
+     * The configuration of application
+     * @member {EggAppConfig}
+     */
+    protected config: EggAppConfig;
+
+    /**
+     * The instance of agent
+     * @member {Agent}
+     */
+    protected agent: Agent;
+
+    /**
+     * The instance of app
+     * @member {Application}
+     */
+    protected app: Application;
   }
 
   export type RequestArrayBody = any[];
@@ -146,7 +170,7 @@ declare module 'egg' {
     body: any;
   }
 
-  export interface Response extends KoaApplication.Response { // tslint:disable-line
+  export interface Response<ResponseBodyT = any> extends KoaApplication.Response { // tslint:disable-line
     /**
      * read response real status code.
      *
@@ -157,29 +181,11 @@ declare module 'egg' {
      * @member {Number} Context#realStatus
      */
     realStatus: number;
+    body: ResponseBodyT;
   }
 
-  export interface ContextView { // tslint:disable-line
-    /**
-     * Render a file by view engine
-     * @param {String} name - the file path based on root
-     * @param {Object} [locals] - data used by template
-     * @param {Object} [options] - view options, you can use `options.viewEngine` to specify view engine
-     * @return {Promise<String>} result - return a promise with a render result
-     */
-    render(name: string, locals?: any, options?: any): Promise<string>;
+  export type LoggerLevel = EggLoggerLevel;
 
-    /**
-     * Render a template string by view engine
-     * @param {String} tpl - template string
-     * @param {Object} [locals] - data used by template
-     * @param {Object} [options] - view options, you can use `options.viewEngine` to specify view engine
-     * @return {Promise<String>} result - return a promise with a render result
-     */
-    renderString(name: string, locals?: any, options?: any): Promise<string>;
-  }
-
-  export type LoggerLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'NONE';
 
   /**
    * egg app info
@@ -187,7 +193,7 @@ declare module 'egg' {
    * ```js
    * // config/config.default.ts
    * import { EggAppInfo } from 'egg';
-   * 
+   *
    * export default (appInfo: EggAppInfo) => {
    *   return {
    *     keys: appInfo.name + '123456',
@@ -204,6 +210,66 @@ declare module 'egg' {
     root: string; // baseDir when local and unittest, HOME when other environment
   }
 
+  type IgnoreItem = string | RegExp | ((ctx: Context) => boolean);
+  type IgnoreOrMatch = IgnoreItem | IgnoreItem[];
+
+  /** logger config of egg */
+  export interface EggLoggerConfig extends RemoveSpecProp<EggLoggersOptions, 'type'> {
+    /** custom config of coreLogger */
+    coreLogger?: Partial<EggLoggerOptions>;
+    /** allow debug log at prod, defaults to true */
+    allowDebugAtProd?: boolean;
+    /** disable logger console after app ready. defaults to `false` on local and unittest env, others is `true`. */
+    disableConsoleAfterReady?: boolean;
+  }
+
+  /** Custom Loader Configuration */
+  export interface CustomLoaderConfig extends RemoveSpecProp<FileLoaderOption, 'inject' | 'target'> {
+    /**
+     * an object you wanner load to, value can only be 'ctx' or 'app'. default to app
+     */
+    inject?: 'ctx' | 'app';
+    /**
+     * whether need to load files in plugins or framework, default to false
+     */
+    loadunit?: boolean;
+  }
+
+  export interface HttpClientBaseConfig {
+    /** Whether use http keepalive */
+    keepAlive?: boolean;
+    /** Free socket after keepalive timeout */
+    freeSocketKeepAliveTimeout?: number;
+    /** Free socket after request timeout */
+    freeSocketTimeout?: number;
+    /** Request timeout */
+    timeout?: number;
+    /** Determines how many concurrent sockets the agent can have open per origin */
+    maxSockets?: number;
+    /** The maximum number of sockets that will be left open in the free state */
+    maxFreeSockets?: number;
+  }
+
+  /** HttpClient config */
+  export interface HttpClientConfig extends HttpClientBaseConfig {
+    /** http.Agent */
+    httpAgent?: HttpClientBaseConfig;
+    /** https.Agent */
+    httpsAgent?: HttpClientBaseConfig;
+    /** Default request args for httpclient */
+    request?: RequestOptions;
+    /** Whether enable dns cache */
+    enableDNSCache?: boolean;
+    /** Enable proxy request, default is false. */
+    enableProxy?: boolean;
+    /** proxy agent uri or options, default is null. */
+    proxy?: string | { [key: string]: any };
+    /** DNS cache lookup interval */
+    dnsCacheLookupInterval?: number;
+    /** DNS cache max age */
+    dnsCacheMaxLength?: number;
+  }
+
   export interface EggAppConfig {
     workerStartTimeout: number;
     baseDir: string;
@@ -217,23 +283,35 @@ declare module 'egg' {
      * @property {String | RegExp | Function | Array} ignore - won't parse request body when url path hit ignore pattern, can not set `ignore` when `match` presented
      * @property {String | RegExp | Function | Array} match - will parse request body only when url path hit match pattern
      * @property {String} encoding - body encoding config, default utf8
-     * @property {String} formLimit - form body size limit, default 100kb
-     * @property {String} jsonLimit - json body size limit, default 100kb
+     * @property {String} formLimit - form body size limit, default 1mb
+     * @property {String} jsonLimit - json body size limit, default 1mb
+     * @property {String} textLimit - json body size limit, default 1mb
      * @property {Boolean} strict - json body strict mode, if set strict value true, then only receive object and array json body
      * @property {Number} queryString.arrayLimit - from item array length limit, default 100
      * @property {Number} queryString.depth - json value deep lenght, default 5
      * @property {Number} queryString.parameterLimit - paramter number limit ,default 1000
+     * @property {string[]} enableTypes - parser will only parse when request type hits enableTypes, default is ['json', 'form']
+     * @property {any} extendTypes - support extend types
      */
     bodyParser: {
       enable: boolean;
       encoding: string;
       formLimit: string;
       jsonLimit: string;
-      strict: true;
+      textLimit: string;
+      strict: boolean;
       queryString: {
         arrayLimit: number;
         depth: number;
         parameterLimit: number;
+      };
+      ignore: IgnoreOrMatch;
+      match: IgnoreOrMatch;
+      enableTypes: string[];
+      extendTypes: {
+        json: string[];
+        form: string[];
+        text: string[];
       };
     };
 
@@ -244,36 +322,24 @@ declare module 'egg' {
      * @property {String} encoding - log file encloding, defaults to utf8
      * @property {String} level - default log level, could be: DEBUG, INFO, WARN, ERROR or NONE, defaults to INFO in production
      * @property {String} consoleLevel - log level of stdout, defaults to INFO in local serverEnv, defaults to WARN in unittest, defaults to NONE elsewise
+     * @property {Boolean} disableConsoleAfterReady - disable logger console after app ready. defaults to `false` on local and unittest env, others is `true`.
      * @property {Boolean} outputJSON - log as JSON or not, defaults to false
      * @property {Boolean} buffer - if enabled, flush logs to disk at a certain frequency to improve performance, defaults to true
      * @property {String} errorLogName - file name of errorLogger
      * @property {String} coreLogName - file name of coreLogger
      * @property {String} agentLogName - file name of agent worker log
      * @property {Object} coreLogger - custom config of coreLogger
+     * @property {Boolean} allowDebugAtProd - allow debug log at prod, defaults to true
      */
-    logger: {
-      dir: string;
-      encoding: string;
-      env: EggEnvType;
-      level: LoggerLevel;
-      consoleLevel: LoggerLevel;
-      outputJSON: boolean;
-      buffer: boolean;
-      appLogName: string;
-      coreLogName: string;
-      agentLogName: string;
-      errorLogName: string;
-      coreLogger: any;
+    logger: EggLoggerConfig;
+
+    /** custom logger of egg */
+    customLogger: {
+      [key: string]: EggLoggerOptions;
     };
 
-    httpclient: {
-      keepAlive: boolean;
-      freeSocketKeepAliveTimeout: number;
-      timeout: number;
-      maxSockets: number;
-      maxFreeSockets: number;
-      enableDNSCache: boolean;
-    };
+    /** Configuration of httpclient in egg. */
+    httpclient: HttpClientConfig;
 
     development: {
       /**
@@ -288,7 +354,31 @@ declare module 'egg' {
        * don't wait all plugins ready, default is true.
        */
       fastReady: boolean;
+      /**
+       * whether reload on debug, default is true.
+       */
+      reloadOnDebug: boolean;
+      /**
+       * whether override default watchDirs, default is false.
+       */
+      overrideDefault: boolean;
+      /**
+       * whether override default ignoreDirs, default is false.
+       */
+      overrideIgnore: boolean;
+      /**
+       * whether to reload, use https://github.com/sindresorhus/multimatch
+       */
+      reloadPattern: string[] | string;
     };
+
+    /**
+     * customLoader config
+     */
+    customLoader: {
+      [key: string]: CustomLoaderConfig;
+    };
+
     /**
      * It will ignore special keys when dumpConfig
      */
@@ -389,27 +479,18 @@ declare module 'egg' {
 
     siteFile: PlainObject<string | Buffer>;
 
-    static: {
-      prefix: string;
-      dir: string;
-      // support lazy load
-      dynamic: boolean;
-      preload: boolean;
-      buffer: boolean;
-      maxFiles: number;
-    } & PlainObject;
-
-    view: {
-      root: string;
-      cache: boolean;
-      defaultExtension: string;
-      defaultViewEngine: string;
-      mapping: PlainObject<string>;
-    };
-
     watcher: PlainObject;
 
     onClientError(err: Error, socket: Socket, app: EggApplication): ClientErrorResponse | Promise<ClientErrorResponse>;
+
+    /**
+     * server timeout in milliseconds, default to 2 minutes.
+     *
+     * for special request, just use `ctx.req.setTimeout(ms)`
+     *
+     * @see https://nodejs.org/api/http.html#http_server_timeout
+     */
+    serverTimeout: number | null;
 
     [prop: string]: any;
   }
@@ -420,7 +501,7 @@ declare module 'egg' {
     headers: { [key: string]: string };
   }
 
-  export interface Router extends KoaRouter {
+  export interface Router extends KoaRouter<any, Context> {
     /**
      * restful router api
      */
@@ -442,41 +523,11 @@ declare module 'egg' {
     url(name: string, params: any): any;
   }
 
-  export class EggApplication extends KoaApplication { // tslint:disable-line
-    /**
-     * The current directory of application
-     */
-    baseDir: string;
-
-    /**
-     * The configuration of application
-     */
-    config: EggAppConfig;
-
-    /**
-     * app.env delegate app.config.env
-     */
-    env: EggEnvType;
-
-    /**
-     * core logger for framework and plugins, log file is $HOME/logs/{appname}/egg-web
-     */
-    coreLogger: Logger;
-
-    /**
-     * Alias to https://npmjs.com/package/depd
-     */
-    deprecate: any;
-
+  export interface EggApplication extends EggCoreBase<EggAppConfig> { // tslint:disable-line
     /**
      * HttpClient instance
      */
-    httpclient: any;
-
-    /**
-     * The loader instance, the default class is EggLoader. If you want define
-     */
-    loader: any;
+    httpclient: EggHttpClient;
 
     /**
      * Logger for Application, wrapping app.coreLogger with context infomation
@@ -489,66 +540,46 @@ declare module 'egg' {
      * this.logger.warn('WARNING!!!!');
      * ```
      */
-    logger: Logger;
+    logger: EggLogger;
+
+    /**
+     * core logger for framework and plugins, log file is $HOME/logs/{appname}/egg-web
+     */
+    coreLogger: EggLogger;
 
     /**
      * All loggers contain logger, coreLogger and customLogger
      */
-    loggers: { [loggerName: string]: Logger };
+    loggers: EggLoggers;
 
     /**
      * messenger instance
      */
-    messenger: any;
-
-    plugins: any;
+    messenger: Messenger;
 
     /**
      * get router
      */
     router: Router;
 
-    Service: Service;
-
-    /**
-     * Whether `application` or `agent`
-     */
-    type: string;
-
     /**
      * create a singleton instance
      */
     addSingleton(name: string, create: any): void;
 
-    /**
-     * Excute scope after loaded and before app start
-     */
-    beforeStart(scrope: () => void): void;
-
-    /**
-     * Close all, it wil close
-     * - callbacks registered by beforeClose
-     * - emit `close` event
-     * - remove add listeners
-     *
-     * If error is thrown when it's closing, the promise will reject.
-     * It will also reject after following call.
-     * @return {Promise} promise
-     * @since 1.0.0
-     */
-    close(): Promise<any>;
+    runSchedule(schedulePath: string): Promise<any>;
 
     /**
      * http request helper base on httpclient, it will auto save httpclient log.
      * Keep the same api with httpclient.request(url, args).
      * See https://github.com/node-modules/urllib#api-doc for more details.
      */
-    curl(url: string, opt?: RequestOptions): Promise<any>;
+    curl: EggHttpClient['request'];
 
     /**
      * Get logger by name, it's equal to app.loggers['name'], but you can extend it with your own logical
      */
-    getLogger(name: string): Logger;
+    getLogger(name: string): EggLogger;
 
     /**
      * print the infomation when console.log(app)
@@ -559,6 +590,31 @@ declare module 'egg' {
      * Alias to Router#url
      */
     url(name: string, params: any): any;
+
+    /**
+     * Create an anonymous context, the context isn't request level, so the request is mocked.
+     * then you can use context level API like `ctx.service`
+     * @member {String} EggApplication#createAnonymousContext
+     * @param {Request} req - if you want to mock request like querystring, you can pass an object to this function.
+     * @return {Context} context
+     */
+    createAnonymousContext(req?: Request): Context;
+
+    /**
+     * export context base classes, let framework can impl sub class and over context extend easily.
+     */
+    ContextCookies: typeof EggCookies;
+    ContextLogger: typeof EggContextLogger;
+    ContextHttpClient: EggContextHttpClientConstructor;
+    HttpClient: EggHttpConstructor;
+    Subscription: typeof Subscription;
+    Controller: typeof Controller;
+    Service: typeof Service;
+  }
+
+  // compatible
+  export class EggApplication {
+    constructor(options?: CoreOptions);
   }
 
   export type RouterPath = string | RegExp;
@@ -568,7 +624,7 @@ declare module 'egg' {
      * global locals for view
      * @see Context#locals
      */
-    locals: any;
+    locals: IApplicationLocals;
 
     /**
      * HTTP get method
@@ -589,6 +645,12 @@ declare module 'egg' {
     put(path: RouterPath, ...middleware: any[]): void;
 
     /**
+     * HTTP patch method
+     */
+    patch(path: RouterPath, fn: string): void;
+    patch(path: RouterPath, ...middleware: any[]): void;
+
+    /**
      * HTTP delete method
      */
     delete(path: RouterPath, fn: string): void;
@@ -604,10 +666,17 @@ declare module 'egg' {
 
     controller: IController;
 
-    Controller: Controller;
-
     middleware: KoaApplication.Middleware[] & IMiddleware;
+
+    /**
+     * Run async function in the background
+     * @see Context#runInBackground
+     * @param {Function} scope - the first args is an anonymous ctx
+     */
+    runInBackground(scope: (ctx: Context) => void): void;
   }
+
+  export interface IApplicationLocals extends PlainObject { }
 
   export interface FileStream extends Readable { // tslint:disable-line
     fields: any;
@@ -627,18 +696,61 @@ declare module 'egg' {
     truncated: boolean;
   }
 
-  export interface Context extends KoaApplication.Context {
+  interface GetFileStreamOptions {
+    requireFile?: boolean; // required file submit, default is true
+    defCharset?: string;
+    limits?: {
+      fieldNameSize?: number;
+      fieldSize?: number;
+      fields?: number;
+      fileSize?: number;
+      files?: number;
+      parts?: number;
+      headerPairs?: number;
+    };
+    checkFile?(
+      fieldname: string,
+      file: any,
+      filename: string,
+      encoding: string,
+      mimetype: string
+    ): void | Error;
+  }
+
+  /**
+  * KoaApplication's Context will carry the default 'cookie' property in
+  * the egg's Context interface, which is wrong here because we have our own
+  * special properties (e.g: encrypted). So we must remove this property and
+  * create our own with the same name.
+  * @see https://github.com/eggjs/egg/pull/2958
+  *
+  * However, the latest version of Koa has "[key: string]: any" on the
+  * context, and there'll be a type error for "keyof koa.Context".
+  * So we have to directly inherit from "KoaApplication.BaseContext" and
+  * rewrite all the properties to be compatible with types in Koa.
+  * @see https://github.com/eggjs/egg/pull/3329
+  */
+  export interface Context<ResponseBodyT = any> extends KoaApplication.BaseContext {
+    [key: string]: any;
+    body: ResponseBodyT;
+
     app: Application;
+
+    // properties of koa.Context
+    req: IncomingMessage;
+    res: ServerResponse;
+    originalUrl: string;
+    respond?: boolean;
 
     service: IService;
 
     request: Request;
 
-    response: Response;
+    response: Response<ResponseBodyT>;
 
-    /**
-     * helper
-     */
+    // The new 'cookies' instead of Koa's.
+    cookies: EggCookies;
+
     helper: IHelper;
 
     /**
@@ -672,7 +784,12 @@ declare module 'egg' {
     params: any;
 
     /**
-     * @see Request#accept
+     * @see Request#query
+     */
+    query: PlainObject<string>;
+
+    /**
+     * @see Request#queries
      */
     queries: PlainObject<string[]>;
 
@@ -697,8 +814,7 @@ declare module 'egg' {
     realStatus: number;
 
     /**
-     * 设置返回资源对象
-     * set the ctx.body.data value
+     * Set the ctx.body.data value
      *
      * @member {Object} Context#data=
      * @example
@@ -774,7 +890,7 @@ declare module 'egg' {
      *
      * @member {Object} Context#locals
      */
-    locals: any;
+    locals: IApplicationLocals & IContextLocals;
 
     /**
      * alias to {@link locals}, compatible with koa that use this variable
@@ -792,7 +908,12 @@ declare module 'egg' {
      * this.logger.warn('WARNING!!!!');
      * ```
      */
-    logger: Logger;
+    logger: EggLogger;
+
+    /**
+     * Get logger by name, it's equal to app.loggers['name'], but you can extend it with your own logical
+     */
+    getLogger(name: string): EggLogger;
 
     /**
      * Request start time
@@ -800,39 +921,11 @@ declare module 'egg' {
     starttime: number;
 
     /**
-     * View instance that is created every request
-     */
-    view: ContextView;
-
-    /**
      * http request helper base on httpclient, it will auto save httpclient log.
      * Keep the same api with httpclient.request(url, args).
      * See https://github.com/node-modules/urllib#api-doc for more details.
      */
-    curl(url: string, opt?: RequestOptions): Promise<any>;
-
-    /**
-     * Get logger by name, it's equal to app.loggers['name'], but you can extend it with your own logical
-     */
-    getLogger(name: string): Logger;
-
-    /**
-     * Render a file by view engine
-     * @param {String} name - the file path based on root
-     * @param {Object} [locals] - data used by template
-     * @param {Object} [options] - view options, you can use `options.viewEngine` to specify view engine
-     * @return {Promise<String>} result - return a promise with a render result
-     */
-    render(name: string, locals?: any, options?: any): Promise<string>;
-
-    /**
-     * Render a template string by view engine
-     * @param {String} tpl - template string
-     * @param {Object} [locals] - data used by template
-     * @param {Object} [options] - view options, you can use `options.viewEngine` to specify view engine
-     * @return {Promise<String>} result - return a promise with a render result
-     */
-    renderString(name: string, locals?: any, options?: any): Promise<string>;
+    curl: EggHttpClient['request'];
 
     __(key: string, ...values: string[]): string;
     gettext(key: string, ...values: string[]): string;
@@ -846,20 +939,27 @@ declare module 'egg' {
      * console.log(stream.fields);
      * ```
      * @method Context#getFileStream
+     * @param {Object} options
      * @return {ReadStream} stream
      * @since 1.0.0
      */
-    getFileStream(): Promise<FileStream>;
+    getFileStream(options?: GetFileStreamOptions): Promise<FileStream>;
 
     /**
      * @see Responce.redirect
      */
     redirect(url: string, alt?: string): void;
+
+    httpclient: EggContextHttpClient;
   }
+
+  export interface IContextLocals extends PlainObject { }
 
   export class Controller extends BaseContextClass { }
 
   export class Service extends BaseContextClass { }
+
+  export class Subscription extends BaseContextClass { }
 
   /**
    * The empty interface `IService` is a placeholder, for egg
@@ -884,9 +984,9 @@ declare module 'egg' {
 
   export interface IController extends PlainObject { } // tslint:disable-line
 
-  export interface IMiddleware extends PlainObject {} // tslint:disable-line
+  export interface IMiddleware extends PlainObject { } // tslint:disable-line
 
-  export interface IHelper extends PlainObject {
+  export interface IHelper extends PlainObject, BaseContextClass {
     /**
      * Generate URL path(without host) for route. Takes the route name and a map of named params.
      * @method Helper#pathFor
@@ -960,31 +1060,146 @@ declare module 'egg' {
   }
 
   export interface ClusterOptions {
-    framework?: string; // specify framework that can be absolute path or npm package
-    baseDir?: string; // directory of application, default to `process.cwd()`
-    plugins?: object | null; // customized plugins, for unittest
-    workers?: number; // numbers of app workers, default to `os.cpus().length`
-    port?: number;  // listening port, default to 7001(http) or 8443(https)
-    https?: boolean;  // https or not
-    key?: string; //ssl key
-    cert?: string;  // ssl cert
-    // typescript?: boolean;
+    /** specify framework that can be absolute path or npm package */
+    framework?: string;
+    /** directory of application, default to `process.cwd()` */
+    baseDir?: string;
+    /** customized plugins, for unittest */
+    plugins?: object | null;
+    /** numbers of app workers, default to `os.cpus().length` */
+    workers?: number;
+    /** listening port, default to 7001(http) or 8443(https) */
+    port?: number;
+    /** https or not */
+    https?: boolean;
+    /** ssl key */
+    key?: string;
+    /** ssl cert */
+    cert?: string;
     [prop: string]: any;
   }
 
   export function startCluster(options: ClusterOptions, callback: (...args: any[]) => any): void;
 
+  export interface StartOptions {
+    /** specify framework that can be absolute path or npm package */
+    framework?: string;
+    /** directory of application, default to `process.cwd()` */
+    baseDir?: string;
+    /** ignore single process mode warning */
+    ignoreWarning?: boolean;
+  }
+
+  export function start(options?: StartOptions): Promise<Application>
+
   /**
    * Powerful Partial, Support adding ? modifier to a mapped property in deep level
    * @example
    * import { PowerPartial, EggAppConfig } from 'egg';
-   * 
+   *
    * // { view: { defaultEngines: string } } => { view?: { defaultEngines?: string } }
    * type EggConfig = PowerPartial<EggAppConfig>
    */
   export type PowerPartial<T> = {
     [U in keyof T]?: T[U] extends object
-      ? PowerPartial<T[U]>
-      : T[U]
+    ? PowerPartial<T[U]>
+    : T[U]
   };
+
+  // send data can be number|string|boolean|object but not Set|Map
+  export interface Messenger extends EventEmitter {
+    /**
+     * broadcast to all agent/app processes including itself
+     */
+    broadcast(action: string, data: any): void;
+
+    /**
+     * send to agent from the app,
+     * send to an random app from the agent
+     */
+    sendRandom(action: string, data: any): void;
+
+    /**
+     * send to specified process
+     */
+    sendTo(pid: number, action: string, data: any): void;
+
+    /**
+     * send to agent from the app,
+     * send to itself from the agent
+     */
+    sendToAgent(action: string, data: any): void;
+
+    /**
+     * send to all app including itself from the app,
+     * send to all app from the agent
+     */
+    sendToApp(action: string, data: any): void;
+  }
+
+  // compatible
+  export interface EggLoaderOptions extends CoreLoaderOptions { }
+  export interface EggLoader extends CoreLoader { }
+
+  /**
+   * App worker process Loader, will load plugins
+   * @see https://github.com/eggjs/egg-core
+   */
+  export class AppWorkerLoader extends CoreLoader {
+    loadConfig(): void;
+    load(): void;
+  }
+
+  /**
+   * Agent worker process loader
+   * @see https://github.com/eggjs/egg-loader
+   */
+  export class AgentWorkerLoader extends CoreLoader {
+    loadConfig(): void;
+    load(): void;
+  }
+
+  export interface IBoot {
+    /**
+     * Ready to call configDidLoad,
+     * Config, plugin files are referred,
+     * this is the last chance to modify the config.
+     */
+    configWillLoad?(): void;
+
+    /**
+     * Config, plugin files have loaded
+     */
+    configDidLoad?(): void;
+
+    /**
+     * All files have loaded, start plugin here
+     */
+    didLoad?(): Promise<void>;
+
+    /**
+     * All plugins have started, can do some thing before app ready
+     */
+    willReady?(): Promise<void>;
+
+    /**
+     * Worker is ready, can do some things,
+     * don't need to block the app boot
+     */
+    didReady?(): Promise<void>;
+
+    /**
+     * Server is listening
+     */
+    serverDidReady?(): Promise<void>;
+
+    /**
+     * Do some thing before app close
+     */
+    beforeClose?(): Promise<void>;
+  }
+
+  export interface Singleton<T> {
+    get(id: string): T;
+  }
 }

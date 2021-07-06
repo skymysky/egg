@@ -51,20 +51,20 @@ exports.io = {
 
 > 命名空间为 `/` 与 `/example`, 不是 `example`
 
-**uws:**
+#### uws
 
-如果想要使用 [uws] 替代默认的 `us` 可以做如下配置
+**Egg Socket 内部默认使用 `ws` 引擎，[uws](https://www.npmjs.com/package/uws) 因为[某些原因](https://github.com/socketio/socket.io/issues/3319)被废止。**
+
+如坚持需要使用，请按照以下配置即可：
 
 ```js
 // {app_root}/config/config.${env}.js
 exports.io = {
-  init: { wsEngine: 'uws' }, // default: us
+  init: { wsEngine: 'uws' }, // default: ws
 };
 ```
 
-> 已知默认 `wsEngine` 在 `Chrome` 浏览器中断开连接存在异常，建议优先使用 [uws]
-
-**redis:**
+#### redis
 
 [egg-socket.io] 内置了 `socket.io-redis`，在 cluster 模式下，使用 redis 可以较为简单的实现 clients/rooms 等信息共享
 
@@ -73,7 +73,7 @@ exports.io = {
 exports.io = {
   redis: {
     host: { redis server host },
-    port: { redis server prot },
+    port: { redis server port },
     auth_pass: { redis server password },
     db: 0,
   },
@@ -198,7 +198,7 @@ const tick = (id, msg) => {
 module.exports = app => {
   return async (ctx, next) => {
     if (true) {
-      ctx.socket.disconnet();
+      ctx.socket.disconnect();
       return;
     }
     await next();
@@ -216,7 +216,7 @@ module.exports = app => {
 module.exports = app => {
   return async (ctx, next) => {
     ctx.socket.emit('res', 'packet received!');
-    console.log('packet:', this.packet);
+    console.log('packet:', ctx.packet);
     await next();
   };
 };
@@ -342,7 +342,7 @@ UI 相关的内容不重复写了，通过 window.socket 调用即可
 // browser
 const log = console.log;
 
-window.onload = function () {
+window.onload = function() {
   // init
   const socket = io('/', {
 
@@ -360,29 +360,28 @@ window.onload = function () {
 
     log('#connect,', id, socket);
 
-    // 接收在线用户信息
-    socket.on('online', msg => {
-      log('#online,', msg);
-    });
-
     // 监听自身 id 以实现 p2p 通讯
     socket.on(id, msg => {
       log('#receive,', msg);
     });
+  });
 
-    // 系统事件
-    socket.on('disconnect', msg => {
-      log('#disconnect', msg);
-    });
+  // 接收在线用户信息
+  socket.on('online', msg => {
+    log('#online,', msg);
+  });
 
-    socket.on('disconnecting', () => {
-      log('#disconnecting');
-    });
+  // 系统事件
+  socket.on('disconnect', msg => {
+    log('#disconnect', msg);
+  });
 
-    socket.on('error', () => {
-      log('#error');
-    });
+  socket.on('disconnecting', () => {
+    log('#disconnecting');
+  });
 
+  socket.on('error', () => {
+    log('#error');
   });
 
   window.socket = socket;

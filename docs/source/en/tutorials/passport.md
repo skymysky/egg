@@ -1,4 +1,5 @@
-## Title: Passport
+title: Passport
+---
 
 **`Login authentication`** is a common business scenario, including "account password login" and "third-party unified login".
 
@@ -18,7 +19,7 @@ The execution sequence of [Passport](http://www.passportjs.org/) is as follows:
 * Serialize user information to Session
 * Jump to the specified page
 
-## Using egg-passport
+## Using `egg-passport`
 
 Below, we will use GitHub login as an example to demonstrate how to use it.
 
@@ -60,7 +61,7 @@ config.passportGithub = {
 };
 ```
 
-**note:**
+**Note:**
 
 * Create a [GitHub OAuth Apps](https://github.com/settings/applications/new) to get the `clientID` and `clientSecret` information.
 * Specify a `callbackURL`, such as `http://127.0.0.1:7001/passport/github/callback`
@@ -159,6 +160,10 @@ The API also be provided for:
     - `options.callbackURL` - callback address after authorization, defaults to `/passport/${strategy}/callback`
 * `app.passport.mount(strategy, options)` - Syntactic sugar for developers to configure routing
 
+
+**Note:**
+ - `app.passport.authenticate`, if `options.successRedirect` or `options.successReturnToOrRedirect` is null, it will redirect to `/` by default
+
 ## Using Passport Ecosystem
 
 [Passport](http://www.passportjs.org/) has many middleware and it is impossible to have the second encapsulation.
@@ -224,7 +229,7 @@ In the previous section, we learned how to use a Passport middleware in the fram
 **initialization:**
 
 ```bash
-$ egg-init --type=plugin egg-passport-local
+$ npm init egg --type=plugin egg-passport-local
 ```
 
 **Configure dependencies in `package.json`:**

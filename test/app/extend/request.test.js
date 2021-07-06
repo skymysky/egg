@@ -76,12 +76,32 @@ describe('test/app/extend/request.test.js', () => {
         assert(req.ip === '127.0.0.1');
         assert(req.ip === '127.0.0.1');
       });
+
+      it('should work with proxy', () => {
+        mm(req.socket, 'remoteAddress', '::ffff:127.0.0.1');
+        mm(req.header, 'x-forwarded-for', '127.0.0.1, 127.0.0.2, 127.0.0.3');
+        mm(app.config, 'proxy', true);
+        mm(app.config, 'maxProxyCount', 1);
+        assert(req.ip === '127.0.0.2');
+      });
     });
 
     describe('req.ips', () => {
       it('should used x-forwarded-for', () => {
-        mm(req.header, 'x-forwarded-for', '127.0.0.1,127.0.0.2');
-        assert.deepEqual(req.ips, [ '127.0.0.1', '127.0.0.2' ]);
+        mm(req.header, 'x-forwarded-for', '127.0.0.1,127.0.0.2,127.0.0.3');
+        assert.deepEqual(req.ips, [ '127.0.0.1', '127.0.0.2', '127.0.0.3' ]);
+      });
+
+      it('should used work with maxProxyCount', () => {
+        mm(req.header, 'x-forwarded-for', '127.0.0.1,127.0.0.2,127.0.0.3');
+        mm(app.config, 'maxProxyCount', 1);
+        assert.deepEqual(req.ips, [ '127.0.0.2', '127.0.0.3' ]);
+      });
+
+      it('should used work with maxIpsCount', () => {
+        mm(req.header, 'x-forwarded-for', '127.0.0.1,127.0.0.2,127.0.0.3');
+        mm(app.config, 'maxIpsCount', 1);
+        assert.deepEqual(req.ips, [ '127.0.0.3' ]);
       });
 
       it('should used x-real-ip', () => {
@@ -165,6 +185,28 @@ describe('test/app/extend/request.test.js', () => {
       });
     });
 
+    describe('this.query && this.queries can be modified', () => {
+      it('should success with querystring present', () => {
+        req.querystring = 'a=a&b=b1&b=b2';
+        assert.deepEqual(req.query, { a: 'a', b: 'b1' });
+        assert.deepEqual(req.queries, { a: [ 'a' ], b: [ 'b1', 'b2' ] });
+        req.query.a = 'aa';
+        req.queries.b = [ 'bb' ];
+        assert.deepEqual(req.query, { a: 'aa', b: 'b1' });
+        assert.deepEqual(req.queries, { a: [ 'a' ], b: [ 'bb' ] });
+      });
+
+      it('should success with empty querystring', () => {
+        req.querystring = '';
+        assert.deepEqual(req.query, {});
+        assert.deepEqual(req.queries, {});
+        req.query.a = 'aa';
+        req.queries.b = [ 'bb' ];
+        assert.deepEqual(req.query, { a: 'aa' });
+        assert.deepEqual(req.queries, { b: [ 'bb' ] });
+      });
+    });
+
     describe('this.query[key] => String', () => {
       function expectQuery(querystring, query) {
         mm(req, 'querystring', querystring);
@@ -173,6 +215,7 @@ describe('test/app/extend/request.test.js', () => {
       }
 
       it('should get string value', () => {
+        expectQuery('=b', {});
         expectQuery('a=b', { a: 'b' });
         expectQuery('a=&', { a: '' });
         expectQuery('a=b&', { a: 'b' });

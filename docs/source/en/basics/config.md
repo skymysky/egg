@@ -10,23 +10,22 @@ Here are some common control tactics:
 
 we choose the last strategy, namely **configure with code**, The change of configuration should be also released after reviewing. The application package itself is capable to be deployed in several environments, only need to specify the running environment.
 
-### Multiple environment configuration
+### Multiple Environment Configuration
 
 This framework supports loading configuration according to the environment and defining configuration files of multiple environments. For more details, please check [env](../basics/env.md).
 
 ```
 config
 |- config.default.js
-|- config.test.js
 |- config.prod.js
 |- config.unittest.js
 |- config.local.js
 ```
 `config.default.js` is the default file for configuration, and all environments will load this file. Besides, this is usually used as default configuration file for development environment.
 
-The corresponding configuration file will be loaded simultaneously when you set up env and the default configuration with the same name will be overwritten. For example, `prod` environment will load `config.prod.js` and `config.default.js`. As a result, `config.prod.js` will overwrite the configuration with identical name in `config.default.js`.
+The corresponding configuration file(named configuration) will be loaded simultaneously when you set up env. The named configuration and the default configuration will combine(use [extend2](https://www.npmjs.com/package/extend2) deep clone) into a configuration eventually. And the same name will be overwritten. For example, `prod` environment will load `config.prod.js` and `config.default.js`. As a result, `config.prod.js` will overwrite the configuration with identical name in `config.default.js`.
 
-### How to write configuration
+### How to Write Configuration
 
 The configuration file returns an object which could overwrite some configurations in the framework. Application can put its own business configuration into it for convenient management.
 
@@ -85,7 +84,7 @@ module.exports = appInfo => {
 };
 ```
 
-### Sequence of loading configurations
+### Sequence of Loading Configurations
 
 Applications, plugin components and framework are able to define those configs. Even though the structure of catalog is identical but there is priority (application > framework > plugin). Besides, the running environment has the higher priority.
 
@@ -100,7 +99,7 @@ Here is one sequence of loading configurations under "prod" environment, in whic
 
 **Note: there will be plugin loading sequence, but the approximate order is similar. For specific logic, please check the [loader](../advanced/loader.md) .**
 
-### Merging rule
+### Rules of Merging
 
 Configs are merged using deep copy from [extend2] module, which is forked from [extend] and process array in a different way.
 
@@ -116,7 +115,7 @@ extend(true, a, b);
 ```
 As demonstrated above, the framework will overwrite arrays instead of merging them.
 
-## Configuration result
+### Configuration Result
 
 The final merged config will be dumped to `run/application_config.json`(for worker process) and `run/agent_config.json`(for agent process) when the framework started, which can help analyzing problems.
 

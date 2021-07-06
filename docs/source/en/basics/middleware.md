@@ -5,7 +5,7 @@ In [the previous chapter](../intro/egg-and-koa.md), we say that Egg is based on 
 
 ## Writing Middleware
 
-### How to write
+### How to Write
 
 Let's take a look at how to write a middleware from a simple gzip example.
 
@@ -215,7 +215,7 @@ module.exports = {
 };
 ```
 
-### match and ignore
+### `match` and `ignore`
 
 match and ignore share the same parameter but do the opposite things. match and ignore cannot be configured in the same time.
 
@@ -230,7 +230,7 @@ module.exports = {
 ```
 match and ignore support various types of configuration ways:
 
-1. String: when string, it sets the prefix of a url path, and all urls starting with this prefix will be matched.
+1. String: when string, it sets the prefix of a url path, and all urls starting with this prefix will be matched. A string array is also accepted.
 2. Regular expression: when regular expression, all urls satisfy this regular expression will be matched.
 3. Function: when function, the request context will be passed to it and what it returns(true/false) determines whether the request is matched or not.
 
@@ -245,3 +245,4 @@ module.exports = {
   },
 };
 ```
+For more configs about `match` and `ignore`, please refer to [egg-path-matching](https://github.com/eggjs/egg-path-matching).

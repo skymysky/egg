@@ -11,6 +11,12 @@
 exports.startCluster = require('egg-cluster').startCluster;
 
 /**
+ * Start egg application with single process mode
+ * @since 1.0.0
+ */
+exports.start = require('./lib/start');
+
+/**
  * @member {Application} Egg#Application
  * @since 1.0.0
  */
@@ -57,3 +63,8 @@ exports.Subscription = require('./lib/core/base_context_class');
  * @since 1.2.0
  */
 exports.BaseContextClass = require('./lib/core/base_context_class');
+
+/**
+ * @member {Boot} Egg#Boot
+ */
+exports.Boot = require('./lib/core/base_hook_class');

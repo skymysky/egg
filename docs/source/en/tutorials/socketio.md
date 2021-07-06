@@ -1,6 +1,7 @@
-## title: Socket.IO
+title: Socket.IO
+---
 
-** Socket.IO ** is a real-time application framework based on Node.js, which has a wide range of applications including instant messaging, notification and message push, real-time analysis and other scenarios.
+**Socket.IO** is a real-time application framework based on Node.js, which has a wide range of applications including instant messaging, notification and message push, real-time analysis and other scenarios.
 
 WebSocket originated from the growing demand for real-time communication in web development, compared with http-based polling, which greatly saves network bandwidth and reduces server performance consumption. [Socket.IO] supports both websockets and polling. The data transmission method is compatible with the browser and does not support the communication requirements under the WebSocket scenario.
 
@@ -19,7 +20,7 @@ The framework provides the [egg-socket.io] plugin with the following development
 $ npm i egg-socket.io --save
 ```
 
-** Enable the plugin: **
+**Enable the plugin:**
 
 ```js
 // {app_root} /config/plugin.js
@@ -50,18 +51,20 @@ exports.io = {
 
 > Namespaces are `/` and `/ example`, not`example`
 
-** uws: **
+#### `uws`
 
-If you want to use [uws] instead of the default `us` you can do the following configuration
+**Egg's socket is using `ws`, [uws](https://www.npmjs.com/package/uws) is deprecated due to [some reasons](https://github.com/socketio/socket.io/issues/3319).**
+		
+If you insist using [uws](https://www.npmjs.com/package/uws) instead of the default `ws`, you can config like this:
 
 ```js
 // {app_root} / config / config. $ {env} .js
 exports.io = {
-  init: { wsEngine: 'uws' } // default: us
+  init: { wsEngine: 'uws' } // default: ws
 };
 ```
 
-** redis: **
+#### `redis`
 
 [egg-socket.io] has built-in redis support via `socket.io-redis`. In cluster mode, the use of redis can make it relatively simple to achieve information sharing of clients/rooms and so on
 
@@ -70,7 +73,7 @@ exports.io = {
 exports.io = {
   redis: {
     host: {redis server host}
-    port: {redis server prot},
+    port: {redis server port},
     auth_pass: {redis server password},
     db: 0,
   },
@@ -80,7 +83,7 @@ exports.io = {
 > When `redis` is turned on, the program tries to connect to the redis server at startup
 > Here `redis` is only used to store connection instance information, see [# server.adapter](https://socket.io/docs/server-api/#server-adapter-value)
 
-**note:**
+**Note:**
 If the project also uses the `egg-redis`, please configure it separately. Do not share it.
 
 ### Deployment
@@ -100,7 +103,7 @@ Modify the `npm scripts` script in`package.json`:
 }
 ```
 
-** Nginx configuration **
+**Nginx configuration**
 
 ```
 location / {
@@ -112,7 +115,7 @@ location / {
 }
 ```
 
-## Using egg-socket.io
+## Using `egg-socket.io`
 
 The directory structure of project which has enabled the [egg-socket.io] is as follows:
 
@@ -143,7 +146,7 @@ Middleware has the following two scenarios:
 
 It is configured in each namespace, respectively, according to the scenarios given above.
 
-**note:**
+**Note:**
 
 If we enable the framework middleware, you will find the following directory in the project:
 
@@ -209,7 +212,7 @@ Acts on each data packet (each message). In the production environment, it is us
 module.exports = app => {
   return async (ctx, next) => {
     ctx.socket.emit('res', 'packet received!');
-    console.log('packet:', this.packet);
+    console.log('packet:', ctx.packet);
     await next();
   };
 };
@@ -265,7 +268,7 @@ module.exports = app => {
 };
 ```
 
-**note:**
+**Note:**
 
 Nsp has the following system events:
 
@@ -317,13 +320,13 @@ Module.exports = app => {
 };
 ```
 
-**Note: ** Each socket connection will have a random and unpredictable unique id `Socket#id` and will automatically be added to the room named after this `id`
+**Note:** Each socket connection will have a random and unpredictable unique id `Socket#id` and will automatically be added to the room named after this `id`
 
 ## Examples
 
 Here we use [egg-socket.io] to do a small example which supports p2p chat
 
-### client
+### Client
 
 The UI-related content is not rewritten. It can be called via window.socket
 
@@ -337,7 +340,7 @@ window.onload = function() {
     // Actual use can pass parameters here
     query: {
       room: 'demo',
-      userId: `client_${Math.random()}`
+      userId: `client_${Math.random()}`,
     },
 
     transports: ['websocket']
@@ -346,27 +349,29 @@ window.onload = function() {
   socket.on('connect', () => {
     const id = socket.id;
 
-    log('#connect,', id, socket); // Receive online user information
+    log('#connect,', id, socket); // receive online user information
 
-    socket.on('online', msg => {
-      log('#online,', msg);
-    }); // Listen for its own id to implement p2p communication
-
+    // listen for its own id to implement p2p communication
     socket.on(id, msg => {
       log('#receive,', msg);
-    }); // system event
-
-    socket.on('disconnect', msg => {
-      log('#disconnect', msg);
     });
+  });
 
-    socket.on('disconnecting', () => {
-      log('#disconnecting');
-    });
+  socket.on('online', msg => {
+    log('#online,', msg);
+  });
 
-    socket.on('error', () => {
-      log('#error');
-    });
+  // system events
+  socket.on('disconnect', msg => {
+    log('#disconnect', msg);
+  });
+
+  socket.on('disconnecting', () => {
+    log('#disconnecting');
+  });
+
+  socket.on('error', () => {
+    log('#error');
   });
 
   window.socket = socket;
@@ -392,11 +397,11 @@ socket.on('res', msg => {
 });
 ```
 
-### server
+### Server
 
-The following is part of the demo code and explains the role of each method
+The following is part of the demo code and explains the role of each method:
 
-#### config
+#### Config
 
 ```js
 // {app_root}/config/config.${env}.js
@@ -415,7 +420,7 @@ exports.io = {
 };
 ```
 
-#### helper
+#### Helper
 
 Framework extensions for encapsulating data formats
 
@@ -459,7 +464,7 @@ Format：
 }
 ```
 
-#### middleware
+#### Middleware
 
 [egg-socket.io] middleware handles socket connection handling
 
@@ -544,7 +549,7 @@ module.exports = () => {
 };
 ```
 
-#### controller
+#### Controller
 
 Data exchange of P2P communication is through exchange
 
@@ -574,7 +579,7 @@ class NspController extends controller {
 module.exports = NspController;
 ```
 
-#### router
+#### Router
 
 ```js
 // {app_root}/app/router.js

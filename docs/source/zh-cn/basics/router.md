@@ -1,4 +1,4 @@
-title: Router 路由
+title: 路由（Router）
 ---
 
 Router 主要用来描述请求 URL 和具体承担执行动作的 Controller 的对应关系，
@@ -69,7 +69,7 @@ router.verb('router-name', 'path-match', middleware1, ..., middlewareN, app.cont
 - 在 Router 定义中， 可以支持多个 Middleware 串联执行
 - Controller 必须定义在 `app/controller` 目录中。
 - 一个文件里面也可以包含多个 Controller 定义，在定义路由的时候，可以通过 `${fileName}.${functionName}` 的方式指定对应的 Controller。
-- Controller 支持子目录，在定义路由的时候，可以通过 `${directoryName}.${fileName}.${functionName}` 的方式制定对应的 Controller。
+- Controller 支持子目录，在定义路由的时候，可以通过 `${directoryName}.${fileName}.${functionName}` 的方式指定对应的 Controller。
 
 下面是一些路由定义的方式：
 
@@ -88,7 +88,7 @@ module.exports = app => {
 ### RESTful 风格的 URL 定义
 
 如果想通过 RESTful 的方式来定义路由，
-我们提供了 `app.resources('routerName', 'pathMatch', controller)` 快速在一个路径上生成 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) 路由结构。
+我们提供了 `app.router.resources('routerName', 'pathMatch', controller)` 快速在一个路径上生成 [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) 路由结构。
 
 ```js
 // app/router.js
@@ -315,13 +315,13 @@ module.exports = () => {
 
 // app/router.js
 module.exports = app => {
-  app.router.get('s', '/search', app.middlewares.uppercase(), app.controller.search)
+  app.router.get('s', '/search', app.middleware.uppercase(), app.controller.search)
 };
 
 // curl http://localhost:7001/search?name=egg
 ```
 
-### 太多路由映射?
+### 太多路由映射？
 
 如上所述，我们并不建议把路由规则逻辑散落在多个地方，会给排查问题带来困扰。
 

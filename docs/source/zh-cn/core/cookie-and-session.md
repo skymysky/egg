@@ -75,6 +75,14 @@ ctx.cookies.set(key, value, {
 - 如果设置的时候指定为 signed，获取时未指定，则不会在获取时对取到的值做验签，导致可能被客户端篡改。
 - 如果设置的时候指定为 encrypt，获取时未指定，则无法获取到真实的值，而是加密过后的密文。
 
+如果要获取前端或者其他系统设置的 cookie，需要指定参数 `signed` 为 `false`，避免对它做验签导致获取不到 cookie 的值。
+
+```js
+ctx.cookies.get('frontend-cookie', {
+  signed: false,
+});
+```
+
 ### Cookie 秘钥
 
 由于我们在 Cookie 中需要用到加解密和验签，所以需要配置一个秘钥供加密使用。在 `config/config.default.js` 中
@@ -106,7 +114,7 @@ class HomeController extends Controller {
     const userId = ctx.session.userId;
     const posts = await ctx.service.post.fetch(userId);
     // 修改 Session 的值
-    ctx.session.visited = ctx.session.visited ? ctx.session.visited++ : 1;
+    ctx.session.visited = ctx.session.visited ? (ctx.session.visited + 1) : 1;
     ctx.body = {
       success: true,
       posts,
@@ -119,6 +127,21 @@ Session 的使用方法非常直观，直接读取它或者修改它就可以了
 
 ```js
 ctx.session = null;
+```
+
+需要 **特别注意** 的是：设置 session 属性时需要避免以下几种情况（会造成字段丢失，详见 [koa-session](https://github.com/koajs/session/blob/master/lib/session.js#L37-L47) 源码）
+
+
+* 不要以 `_` 开头
+* 不能为 `isNew`
+
+```js
+// ❌ 错误的用法
+ctx.session._visited = 1;   //    --> 该字段会在下一次请求时丢失
+ctx.session.isNew = 'HeHe'; //    --> 为内部关键字, 不应该去更改
+
+// ✔️ 正确的用法
+ctx.session.visited = 1;    //   -->  此处没有问题
 ```
 
 Session 的实现是基于 Cookie 的，默认配置下，用户 Session 的内容加密后直接存储在 Cookie 中的一个字段中，用户每次请求我们网站的时候都会带上这个 Cookie，我们在服务端解密后使用。Session 的默认配置如下：
@@ -181,7 +204,7 @@ exports.sessionRedis = {
 
 #### 修改用户 Session 失效时间
 
-虽然在 Session 的配置中有一项是 maxAge，但是它只能全局设置 Session 的有效期，我们经常可以在一些网站的登陆页上看到有 **记住我** 的选项框，勾选之后可以让登陆用户的 Session 有效期更长。这种针对特定用户的 Session 有效时间设置我们可以通过 `ctx.session.maxAge=` 来实现。
+虽然在 Session 的配置中有一项是 maxAge，但是它只能全局设置 Session 的有效期，我们经常可以在一些网站的登录页上看到有 **记住我** 的选项框，勾选之后可以让登录用户的 Session 有效期更长。这种针对特定用户的 Session 有效时间设置我们可以通过 `ctx.session.maxAge=` 来实现。
 
 ```js
 const ms = require('ms');

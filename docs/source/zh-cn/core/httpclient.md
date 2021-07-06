@@ -5,7 +5,7 @@ title: HttpClient
 
 为此框架基于 [urllib] 内置实现了一个 [HttpClient]，应用可以非常便捷地完成任何 HTTP 请求。
 
-## 通过 app 使用 HttpClient
+## 通过 `app` 使用 HttpClient
 
 框架在应用初始化的时候，会自动将 [HttpClient] 初始化到 `app.httpclient`。
 同时增加了一个 `app.curl(url, options)` 方法，它等价于 `app.httpclient.request(url, options)`。
@@ -25,7 +25,7 @@ module.exports = app => {
 };
 ```
 
-## 通过 Context 使用 HttpClient
+## 通过 `ctx` 使用 HttpClient
 
 框架在 Context 中同样提供了 `ctx.curl(url, options)` 和 `ctx.httpclient`，保持跟 app 下的使用体验一致。
 这样就可以在有 Context 的地方（如在 controller 中）非常方便地使用 `ctx.curl()` 方法完成一次 HTTP 请求。
@@ -201,30 +201,33 @@ class NpmController extends Controller {
 
 当一个 Form 表单提交包含文件的时候，请求数据格式就必须以 [multipart/form-data](http://tools.ietf.org/html/rfc2388)
 进行提交了。
-这个时候需要引入 [formstream] 这个第三方模块来帮助我们生成可以被 HttpClient 消费的 `form` 对象。
+
+[urllib] 内置了 [formstream] 模块来帮助我们生成可以被消费的 `form` 对象。
 
 ```js
-// app/controller/npm.js
-const FormStream = require('formstream');
-class NpmController extends Controller {
+// app/controller/http.js
+class HttpController extends Controller {
   async upload() {
-    const ctx = this.ctx;
-    const form = new FormStream();
-    // 设置普通的 key value
-    form.field('foo', 'bar');
-    // 上传当前文件本身用于测试
-    form.file('file', __filename);
+    const { ctx } = this;
 
     const result = await ctx.curl('https://httpbin.org/post', {
-      // 必须指定 method，支持 POST，PUT
       method: 'POST',
-      // 生成符合 multipart/form-data 要求的请求 headers
-      headers: form.headers(),
-      // 以 stream 模式提交
-      stream: form,
-      // 明确告诉 HttpClient 以 JSON 格式处理响应 body
       dataType: 'json',
+      data: {
+        foo: 'bar',
+      },
+
+      // 单文件上传
+      files: __filename,
+
+      // 多文件上传
+      // files: {
+      //   file1: __filename,
+      //   file2: fs.createReadStream(__filename),
+      //   file3: Buffer.from('mock file content'),
+      // },
     });
+
     ctx.body = result.data.files;
     // 响应最终会是类似以下的结果：
     // {
@@ -232,13 +235,6 @@ class NpmController extends Controller {
     // }
   }
 }
-```
-
-当然，你还可以继续通过 `form.file()` 添加更多文件以实现一次性上传多个文件的需求。
-
-```js
-form.file('file1', file1);
-form.file('file2', file2);
 ```
 
 ### 以 Stream 方式上传文件
@@ -301,7 +297,7 @@ exports.httpclient = {
     // 默认开启 http KeepAlive 功能
     keepAlive: true,
     // 空闲的 KeepAlive socket 最长可以存活 4 秒
-    freeSocketKeepAliveTimeout: 4000,
+    freeSocketTimeout: 4000,
     // 当 socket 超过 30 秒都没有任何活动，就会被当作超时处理掉
     timeout: 30000,
     // 允许创建的最大 socket 数
@@ -314,7 +310,7 @@ exports.httpclient = {
     // 默认开启 https KeepAlive 功能
     keepAlive: true,
     // 空闲的 KeepAlive socket 最长可以存活 4 秒
-    freeSocketKeepAliveTimeout: 4000,
+    freeSocketTimeout: 4000,
     // 当 socket 超过 30 秒都没有任何活动，就会被当作超时处理掉
     timeout: 30000,
     // 允许创建的最大 socket 数
@@ -386,6 +382,36 @@ ctx.curl(url, {
   content: '<xml><hello>world</hello></xml>',
   headers: {
     'content-type': 'text/html',
+  },
+});
+```
+
+### `files: Mixed`
+
+文件上传，支持格式： `String | ReadStream | Buffer | Array | Object`。
+
+```js
+ctx.curl(url, {
+  method: 'POST',
+  files: '/path/to/read',
+  data: {
+    foo: 'other fields',
+  },
+});
+```
+
+多文件上传：
+
+```js
+ctx.curl(url, {
+  method: 'POST',
+  files: {
+    file1: '/path/to/read',
+    file2: fs.createReadStream(__filename),
+    file3: Buffer.from('mock file content'),
+  },
+  data: {
+    foo: 'other fields',
   },
 });
 ```
@@ -662,40 +688,37 @@ console.log(result.res.timing);
 
 ## 调试辅助
 
-框架还提供了 [egg-development-proxyagent] 插件来方便开发者调试。
-
-先安装和开启插件：
-
-```bash
-$ npm i egg-development-proxyagent --save
-```
+如果你需要对 HttpClient 的请求进行抓包调试，可以添加以下配置到 `config.local.js`：
 
 ```js
-// config/plugin.js
-exports.proxyagent = {
-  enable: true,
-  package: 'egg-development-proxyagent',
+// config.local.js
+module.exports = () => {
+  const config = {};
+
+  // add http_proxy to httpclient
+  if (process.env.http_proxy) {
+    config.httpclient = {
+      request: {
+        enableProxy: true,
+        rejectUnauthorized: false,
+        proxy: process.env.http_proxy,
+      },
+    };
+  }
+
+  return config;
 }
 ```
 
-开启抓包工具，可以用 [charles] 或 [fiddler]，此处我们用 [anyproxy] 来演示下。
+然后启动你的抓包工具，如 [charles] 或 [fiddler]。
 
-```bash
-$ npm install anyproxy -g
-$ anyproxy --port 8888
-```
-
-使用环境变量启动应用：
+最后通过以下指令启动应用：
 
 ```bash
 $ http_proxy=http://127.0.0.1:8888 npm run dev
 ```
 
-然后就可以正常操作了，所有经过 HttpClient 的请求，都可以在 http://localhost:8002 这个控制台中查看到。
-
-![anyproxy](https://cloud.githubusercontent.com/assets/227713/21976937/06a63694-dc0f-11e6-98b5-e9e279c4867c.png)
-
-**注意：该插件默认只在 local 环境下启动。**
+然后就可以正常操作了，所有经过 HttpClient 的请求，都可以你的抓包工具中查看到。
 
 ## 常见错误
 
@@ -738,7 +761,7 @@ $ http_proxy=http://127.0.0.1:8888 npm run dev
 ## 全局 `request` 和 `response` 事件
 
 在企业应用场景，常常会有统一 tracer 日志的需求。
-为了方便在 app 层面统一监听 HttpClient 的请求和响应，我们约定了全局 `request` 和 `response` 事件来暴露这两个时机。
+为了方便在 app 层面统一监听 HttpClient 的请求和响应，我们约定了全局 `request` 和 `response` 来暴露这两个事件。
 
 ```bash
     init options
@@ -783,14 +806,12 @@ app.httpclient.on('response', result => {
 
 ## 示例代码
 
-完整示例代码可以在 [eggjs/exmaples/httpclient](https://github.com/eggjs/examples/blob/master/httpclient) 找到。
+完整示例代码可以在 [eggjs/examples/httpclient](https://github.com/eggjs/examples/blob/master/httpclient) 找到。
 
 [urllib]: https://github.com/node-modules/urllib
 [HttpClient]: https://github.com/eggjs/egg/blob/master/lib/core/httpclient.js
 [formstream]: https://github.com/node-modules/formstream
 [HTTP]: https://nodejs.org/api/http.html
 [HTTPS]: https://nodejs.org/api/https.html
-[egg-development-proxyagent]: https://github.com/eggjs/egg-development-proxyagent
 [charles]: https://www.charlesproxy.com/
 [fiddler]: http://www.telerik.com/fiddler
-[anyproxy]: https://github.com/alibaba/anyproxy

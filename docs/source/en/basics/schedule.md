@@ -67,7 +67,7 @@ This scheduled task will be executed every 1 minute on every worker process, the
 
 Schedule tasks can specify `interval` or `cron` two different schedule modes.
 
-#### interval
+#### `interval`
 
 Configure the scheduled tasks by `schedule.interval`, scheduled tasks will be executed every specified time interval. `interval` can be configured as
 
@@ -83,7 +83,7 @@ module.exports = {
 };
 ```
 
-#### cron
+#### `cron`
 
 Configure the scheduled tasks by `schedule.cron`, scheduled tasks will be executed at specified timing according to the cron expressions. cron expressions are parsed by [cron-parser](https://github.com/harrisiirak/cron-parser).
 
@@ -124,6 +124,7 @@ In addition to the parameters just introduced, scheduled task also supports thes
 - `cronOptions`: configure cron time zone and so on, reference [cron-parser](https://github.com/harrisiirak/cron-parser#options)
 - `immediate`: when this parameter is set to true, this scheduled task will be executed immediately after the application is started and ready.
 - `disable`: when this parameter is set to true, this scheduled task will not be executed.
+- `env`: env list to decide whether start this task at current env.
 
 ### Logging
 
@@ -141,15 +142,14 @@ config.customLogger = {
 
 ### Dynamically Configure Scheduled Tasks
 
-Sometimes we need to determine the different environment to configure the parameters of scheduled tasks. Scheduled tasks support another development style:
+Sometimes we need to configure the parameters of scheduled tasks. Scheduled tasks support another development style:
 
 ```js
 module.exports = app => {
   return {
     schedule: {
-      interval: '1m',
+      interval: app.config.cacheTick,
       type: 'all',
-      disable: app.config.env === 'local', // not execute when local dev
     },
     async task(ctx) {
       const res = await ctx.curl('http://www.api.com/cache', {
@@ -207,7 +207,7 @@ module.exports = agent => {
     start() {
       // subscribe other distributed scheduling service message, after receiving the message, allow a worker process to execute scheduled tasks
       // the user configures the distributed scheduling scenario in the configuration of the scheduled task
-      agent.mq.subscribe(schedule.scene, () => this.sendOne());
+      agent.mq.subscribe(this.schedule.scene, () => this.sendOne());
     }
   }
   agent.schedule.use('cluster', ClusterStrategy);
@@ -216,6 +216,6 @@ module.exports = agent => {
 
 `ScheduleStrategy` base class provides:
 
-- `schedule` - Properties of schedule tasks, `disable` is supported by default, other configurations can be parsed by developers.
+- `this.schedule` - Properties of schedule tasks, `disable` is supported by default, other configurations can be parsed by developers.
 - `this.sendOne(...args)` - Notice worker to execute the task randomly, `args` will pass to `subscribe(...args)` or `task(ctx, ...args)`.
 - `this.sendAll(...args)` - Notice all worker to execute the task.

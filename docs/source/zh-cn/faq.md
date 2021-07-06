@@ -3,14 +3,14 @@ title: 常见问题
 
 如果下面的内容无法解决你的问题，请查看 [Egg issues](https://github.com/eggjs/egg/issues)。
 
-## 如何高效的反馈问题？
+## 如何高效地反馈问题？
 
 感谢您向我们反馈问题。
 
 1. 我们推荐如果是小问题（错别字修改，小的 bug fix）直接提交 PR。
 2. 如果是一个新需求，请提供：详细需求描述，最好是有伪代码示意。
 3. 如果是一个 BUG，请提供：复现步骤，错误日志以及相关配置，并尽量填写下面的模板中的条目。
-4. **如果可以，尽可能使用 `egg-init --type=simple bug` 提供一个最小可复现的代码仓库，方便我们排查问题。**
+4. **如果可以，尽可能使用 `npm init egg --type=simple bug` 提供一个最小可复现的代码仓库，方便我们排查问题。**
 5. 不要挤牙膏似的交流，扩展阅读：[如何向开源项目提交无法解答的问题](https://zhuanlan.zhihu.com/p/25795393)
 
 最重要的是，请明白一件事：开源项目的用户和维护者之间并不是甲方和乙方的关系，issue 也不是客服工单。在开 issue 的时候，请抱着一种『一起合作来解决这个问题』的心态，不要期待我们单方面地为你服务。
@@ -85,8 +85,8 @@ Egg 内置的 [egg-security](https://github.com/eggjs/egg-security/) 插件默�
 
 没有自动重启的情况一般是在使用 Jetbrains 旗下软件（IntelliJ IDEA, WebStorm..），并且开启了 Safe Write 选项。
 
-Jetbrains [Safe Write 文档](https://www.jetbrains.com/help/webstorm/2016.3/system-settings.html)中有提到：
+Jetbrains [Safe Write 文档](https://www.jetbrains.com/help/webstorm/2016.3/system-settings.html)中有提到（翻译如下）：
 
-> If this check box is selected, a changed file is first saved in a temporary file. If the save operation succeeds, the file being saved is replaced with the saved file. (Technically, the original file is deleted and the temporary file is renamed.)
+> 如果此复选框打钩，变更的文件将首先被存储在一个临时文件中。如果成功保存了该文件，那么就会被这个文件所取代（从技术上来说，原文件被删除，临时文件被重命名）。
 
 由于使用了重命名导致文件监听的失效。解决办法是关掉 Safe Write 选项。（Settings | Appearance & Behavior | System Settings | Use "safe write" 路径可能根据版本有所不同）

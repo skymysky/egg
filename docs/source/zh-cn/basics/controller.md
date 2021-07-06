@@ -1,4 +1,4 @@
-title: controller
+title: 控制器（Controller）
 ---
 
 ## 什么是 Controller
@@ -314,17 +314,113 @@ module.exports = {
 
 ### 获取上传的文件
 
-请求 body 除了可以带参数之外，还可以发送文件，一般来说，浏览器上都是通过 `Multipart/form-data` 格式发送文件的，框架通过内置 [Multipart](https://github.com/eggjs/egg-multipart) 插件来支持获取用户上传的文件。
+请求 body 除了可以带参数之外，还可以发送文件，一般来说，浏览器上都是通过 `Multipart/form-data` 格式发送文件的，框架通过内置 [Multipart](https://github.com/eggjs/egg-multipart) 插件来支持获取用户上传的文件，我们为你提供了两种方式：
 
-完整的上传示例参见：[eggjs/examples/multipart](https://github.com/eggjs/examples/tree/master/multipart)。
+- #### File 模式：
+如果你完全不知道 Nodejs 中的 Stream 用法，那么 File 模式非常合适你：
 
-在 Controller 中，我们可以通过 `ctx.getFileStream()` 接口能获取到上传的文件流。
+1）在 config 文件中启用 `file` 模式：
+```js
+// config/config.default.js
+exports.multipart = {
+  mode: 'file',
+};
+```
+
+2）上传 / 接收文件：
+
+1. 上传 / 接收单个文件：
+
+你的前端静态页面代码应该看上去如下样子：
+```html
+<form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
+  title: <input name="title" />
+  file: <input name="file" type="file" />
+  <button type="submit">Upload</button>
+</form>
+```
+对应的后端代码如下：
+```js
+// app/controller/upload.js
+const Controller = require('egg').Controller;
+const fs = require('mz/fs');
+
+module.exports = class extends Controller {
+  async upload() {
+    const { ctx } = this;
+    const file = ctx.request.files[0];
+    const name = 'egg-multipart-test/' + path.basename(file.filename);
+    let result;
+    try {
+      // 处理文件，比如上传到云端
+      result = await ctx.oss.put(name, file.filepath);
+    } finally {
+      // 需要删除临时文件
+      await fs.unlink(file.filepath);
+    }
+
+    ctx.body = {
+      url: result.url,
+      // 获取所有的字段值
+      requestBody: ctx.request.body,
+    };
+  }
+};
+```
+
+2. 上传 / 接收多个文件：
+
+对于多个文件，我们借助 `ctx.request.files` 属性进行遍历，然后分别进行处理：
+
+你的前端静态页面代码应该看上去如下样子：
+```html
+<form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
+  title: <input name="title" />
+  file1: <input name="file1" type="file" />
+  file2: <input name="file2" type="file" />
+  <button type="submit">Upload</button>
+</form>
+```
+对应的后端代码：
+```js
+// app/controller/upload.js
+const Controller = require('egg').Controller;
+const fs = require('mz/fs');
+
+module.exports = class extends Controller {
+  async upload() {
+    const { ctx } = this;
+    console.log(ctx.request.body);
+    console.log('got %d files', ctx.request.files.length);
+    for (const file of ctx.request.files) {
+      console.log('field: ' + file.fieldname);
+      console.log('filename: ' + file.filename);
+      console.log('encoding: ' + file.encoding);
+      console.log('mime: ' + file.mime);
+      console.log('tmp filepath: ' + file.filepath);
+      let result;
+      try {
+        // 处理文件，比如上传到云端
+        result = await ctx.oss.put('egg-multipart-test/' + file.filename, file.filepath);
+      } finally {
+        // 需要删除临时文件
+        await fs.unlink(file.filepath);
+      }
+      console.log(result);
+    }
+  }
+};
+```
+- #### Stream 模式：
+如果你对于 Node 中的 Stream 模式非常熟悉，那么你可以选择此模式。在 Controller 中，我们可以通过 `ctx.getFileStream()` 接口能获取到上传的文件流。
+
+1. 上传 / 接受单个文件：
 
 ```html
 <form method="POST" action="/upload?_csrf={{ ctx.csrf | safe }}" enctype="multipart/form-data">
   title: <input name="title" />
   file: <input name="file" type="file" />
-  <button type="submit">上传</button>
+  <button type="submit">Upload</button>
 </form>
 ```
 
@@ -364,6 +460,8 @@ module.exports = UploaderController;
 - 只支持上传一个文件。
 - 上传文件必须在所有其他的 fields 后面，否则在拿到文件流时可能还获取不到 fields。
 
+2. 上传 / 接受多个文件：
+
 如果要获取同时上传的多个文件，不能通过 `ctx.getFileStream()` 来获取，只能通过下面这种方式：
 
 ```js
@@ -375,10 +473,10 @@ class UploaderController extends Controller {
     const ctx = this.ctx;
     const parts = ctx.multipart();
     let part;
-    // parts() return a promise
+    // parts() 返回 promise 对象
     while ((part = await parts()) != null) {
       if (part.length) {
-        // 如果是数组的话是 filed
+        // 这是 busboy 的字段
         console.log('field: ' + part[0]);
         console.log('value: ' + part[1]);
         console.log('valueTruncated: ' + part[2]);
@@ -448,7 +546,7 @@ module.exports = UploaderController;
 ```js
 module.exports = {
   multipart: {
-    fileExtensions: [ '.apk' ], // 增加对 .apk 扩展名的支持
+    fileExtensions: [ '.apk' ] // 增加对 apk 扩展名的文件支持
   },
 };
 ```
@@ -463,7 +561,9 @@ module.exports = {
 };
 ```
 
-**注意：当传递了 whitelist 属性时，fileExtensions 属性不生效。**
+**注意：当重写了 whitelist 时，fileExtensions 不生效。**
+
+欲了解更多相关此技术细节和详情，请参阅 [Egg-Multipart](https://github.com/eggjs/egg-multipart)。
 
 ### header
 
@@ -513,7 +613,7 @@ HTTP 请求都是无状态的，但是我们的 Web 应用通常都需要知道�
 class CookieController extends Controller {
   async add() {
     const ctx = this.ctx;
-    const count = ctx.cookies.get('count');
+    let count = ctx.cookies.get('count');
     count = count ? Number(count) : 0;
     ctx.cookies.set('count', ++count);
     ctx.body = count;
@@ -530,6 +630,29 @@ class CookieController extends Controller {
 Cookie 虽然在 HTTP 中只是一个头，但是通过 `foo=bar;foo1=bar1;` 的格式可以设置多个键值对。
 
 Cookie 在 Web 应用中经常承担了传递客户端身份信息的作用，因此有许多安全相关的配置，不可忽视，[Cookie](../core/cookie-and-session.md#cookie) 文档中详细介绍了 Cookie 的用法和安全相关的配置项，可以深入阅读了解。
+
+#### 配置
+
+对于 Cookie 来说，主要有下面几个属性可以在 `config.default.js` 中进行配置:
+
+```js
+module.exports = {
+  cookies: {
+    // httpOnly: true | false,
+    // sameSite: 'none|lax|strict',
+  },
+};
+```
+
+举例: 配置应用级别的 Cookie [SameSite](https://www.ruanyifeng.com/blog/2019/09/cookie-samesite.html) 属性等于 `Lax`。
+
+```js
+module.exports = {
+  cookies: {
+    sameSite: 'lax',
+  },
+};
+```
 
 ### Session
 

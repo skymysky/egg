@@ -9,15 +9,14 @@ By following along with this guide step by step, you can quickly get started wit
 - Operating System: Linux, OS X or Windows.
 - Node.js Runtime: 8.x or newer; it is recommended that you use [LTS Releases][Node.js].
 
-## the Quick Way
+## The Quick Way
 
 To begin with, let's quickly initialize the project by using a scaffold,
-which will quickly generate some of the major pieces of the application.
+which will quickly generate some of the major pieces of the application (`npm >=6.1.0`).
 
 ```bash
-$ npm i egg-init -g
-$ egg-init egg-example --type=simple
-$ cd egg-example
+$ mkdir egg-example && cd egg-example
+$ npm init egg --type=simple
 $ npm i
 ```
 
@@ -25,12 +24,12 @@ Then get up and run by using the following commands.
 
 ```bash
 $ npm run dev
-$ open localhost:7001
+$ open http://localhost:7001
 ```
 
 ## Step by Step
 
-Usually you can just use [egg-init] of the previous section,
+Usually you can just use `npm init egg` of the previous section,
 choose a scaffold that best fits your business model and quickly generate a project,
 then get started with the development.
 
@@ -94,7 +93,7 @@ Then add a [configuration](../basics/config.md) file:
 
 ```js
 // config/config.default.js
-exports.keys = <YOUR_SECURITY_COOKE_KEYS>;
+exports.keys = <YOUR_SECURITY_COOKIE_KEYS>;
 ```
 
 The project directory looks like this:
@@ -116,7 +115,7 @@ Now you can start up the Web Server and see your application in action.
 
 ```bash
 $ npm run dev
-$ open localhost:7001
+$ open http://localhost:7001
 ```
 
 > Note：
@@ -124,7 +123,7 @@ $ open localhost:7001
 > - You could write `Controller` with `class` or `exports` style, see more detail at [Controller](../basics/controller.md).
 > - And `Config` could write with `module.exports` or `exports` style, see more detail at [Node.js modules docs](https://nodejs.org/api/modules.html#modules_exports_shortcut).
 
-### Add Static Assets
+### Adding Static Assets
 
 Egg has a built-in plugin called [static][egg-static].
 In production, it is recommended that you deploy static assets to CDN instead of using this plugin.
@@ -142,20 +141,20 @@ app/public
     └── news.js
 ```
 
-### Add Templates for Rendering
+### Adding Templates for Rendering
 
 In most cases, data are usually read, processed and rendered by the templates before being presented to the user.
 Thus we need to introduce corresponding template engines to handle it.
 
 Egg does not force to use any particular template engines,
-but specifies the [View Plug-ins Specification](../advanced/view-plugin.md)
-to allow the developers to use different plug-ins for their individual needs instead.
+but specifies the [View Plugins Specification](../advanced/view-plugin.md)
+to allow the developers to use different plugins for their individual needs instead.
 
 For more information, cf. [View](../core/view.md).
 
 In this example, we will use [Nunjucks].
 
-First install the corresponding plug-in [egg-view-nunjucks].
+First install the corresponding plugin [egg-view-nunjucks].
 
 ```bash
 $ npm i egg-view-nunjucks --save
@@ -239,7 +238,7 @@ module.exports = app => {
 Open a browser window and navigate to http://localhost:7001/news.
 You should be able to see the rendered page.
 
-**Tip：In development, Egg enables the [development][egg-development] plug-in by default, which reloads your worker process when changes are made to your back-end code.**
+**Tip：In development, Egg enables the [development][egg-development] plugin by default, which reloads your worker process when changes are made to your back-end code.**
 
 ### Create a Service
 
@@ -255,7 +254,7 @@ Let's create a service to fetch data from the
 // app/service/news.js
 const Service = require('egg').Service;
 
-class NewsService extends app.Service {
+class NewsService extends Service {
   async list(page = 1) {
     // read config
     const { serverUrl, pageSize } = this.config.news;
@@ -304,7 +303,7 @@ class NewsController extends Controller {
 module.exports = NewsController;
 ```
 
-And also add config.
+And also add  config.
 
 ```js
 // config/config.default.js
@@ -315,7 +314,7 @@ exports.news = {
 };
 ```
 
-### Add Extensions
+### Adding Extensions
 
 We might encounter a small problem here.
 The time that we fetched are Unix Time format,
@@ -344,7 +343,7 @@ Then use it in the templates.
 {{ helper.relativeTime(item.time) }}
 ```
 
-### Add Middlewares
+### Adding Middlewares
 
 Suppose that we wanted to prohibit accesses from Baidu crawlers.
 
@@ -385,14 +384,14 @@ Now try it using `curl localhost:7001/news -A "Baiduspider"`.
 See [Middleware](../basics/middleware.md) for more details.
 
 
-### Add Configurations
+### Adding Configurations
 
 When writing business logic,
 it is inevitable that we need to manage configurations.
 Egg provides a powerful way to manage them in a merged configuration file.
 
 - Environment-specific configuration files are well supported, e.g. config.local.js, config.prod.js, etc.
-- Configurations could be set wherever convenient, e.g. near Applications/Plug-ins/Framesworks, and Egg will be careful to merge and load them.
+- Configurations could be set wherever convenient for Applications/Plugins/Frameworks, and Egg will be careful to merge and load them.
 - For more information on merging, see [Configurations](../basics/config.md).
 
 ```js
@@ -424,7 +423,7 @@ class SomeService extends Service {
 module.exports = SomeService;
 ```
 
-### Add Unit Testing
+### Adding Unit Testing
 
 Unit Testing is very important, and Egg also provides [egg-bin] to help you write tests painless.
 
@@ -481,7 +480,6 @@ Where to go from here? read our documentation to better understand the framework
 - Egg framework enables developers to write painless unit testing with many plugins and community-powered toolings. The team should give it a try by using Egg unit testing without worrying about setting up the testing tooling but writing the testing logics. See [Unit Testing](../core/unittest.md).
 
 [Node.js]: http://nodejs.org
-[egg-init]: https://github.com/eggjs/egg-init
 [egg-bin]: https://github.com/eggjs/egg-bin
 [egg-static]: https://github.com/eggjs/egg-static
 [egg-development]: https://github.com/eggjs/egg-development

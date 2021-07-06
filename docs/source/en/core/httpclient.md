@@ -5,7 +5,7 @@ Countless services rely on the HTTP-based communication nowadays, and it is a ve
 
 The framework built in [HttpClient] based on [urllib], you can quickly complete any HTTP request.
 
-## Using HttpClient by app
+## Using HttpClient by `app`
 
 [HttpClient] will initialize to `app.httpclient` automatically during the application's initialization.
 Also added an method `app.curl(url, options)`, which is equivalent to the `app.httpclient.request(url, options)`.
@@ -25,7 +25,7 @@ module.exports = app => {
 };
 ```
 
-## Using HttpClient by Context
+## Using HttpClient by `ctx`
 
 Framework also provides `ctx.curl(url, options)` and `ctx.httpclient` in Context, same as app.
 So it's very easy to use `ctx.curl()` to complete a HTTP request in the Context (such as in the controller)
@@ -160,7 +160,7 @@ class NpmController extends Controller {
 }
 ```
 
-## Advanced HTTP request
+## Advanced HTTP Request
 
 In some real application scenarios, still have some more complex HTTP requests.
 
@@ -197,32 +197,34 @@ class NpmController extends Controller {
 ### Uploading Files by Multipart
 
 Once form submission contains files, submission of requesting data must be [multipart/form-data](http://tools.ietf.org/html/rfc2388)
-We need to introduce third party module [formstream] to generate `form` objects that can be consumed by HttpClient.
+[urllib] has a built-in module [formstream] to generate `form` objects that can be consumed by HttpClient.
 
 ```js
-// app/controller/npm.js
-const FormStream = require('formstream');
-class NpmController extends Controller {
+// app/controller/http.js
+class HttpController extends Controller {
   async upload() {
-    const ctx = this.ctx;
-    const form = new FormStream();
-    // set normal field and value
-    form.field('foo', 'bar');
-    // uploading the current file for test propose
-    form.file('file', __filename);
+    const { ctx } = this;
 
     const result = await ctx.curl('https://httpbin.org/post', {
-     // method is required, supports POST，PUT
       method: 'POST',
-      // generate request headers following the requirements of multipart/form-data
-      headers: form.headers(),
-      // submitted as stream mode
-      stream: form,
-      // telling HttpClient to process the return body as JSON format explicitly
       dataType: 'json',
+      data: {
+        foo: 'bar',
+      },
+
+      // one file
+      files: __filename,
+
+      // many files
+      // files: {
+      //   file1: __filename,
+      //   file2: fs.createReadStream(__filename),
+      //   file3: Buffer.from('mock file content'),
+      // },
     });
+
     ctx.body = result.data.files;
-    // final response will similar as below:
+    // Response:
     // {
     //   "file": "'use strict';\n\nconst For...."
     // }
@@ -230,14 +232,7 @@ class NpmController extends Controller {
 }
 ```
 
-Of course, you can add more files to achieve the requirements of upload multiple files at one time by `form.file()`
-
-```js
-form.file('file1', file1);
-form.file('file2', file2);
-```
-
-### Uploading files in Stream Mode
+### Uploading Files in Stream Mode
 
 In fact, Stream is the leading in the world of Node.js.
 If the server supports streaming, the most friendly way is to send the Stream directly. Actually, Stream will be sent in `Transfer-Encoding: chunked` transmission coding format, which is implemented by [HTTP] module automatically.
@@ -268,7 +263,7 @@ class NpmController extends Controller {
 }
 ```
 
-## options Parameters in Detail
+## Options Parameters in Detail
 
 Due to the complexity of HTTP Request, the options parameters of `httpclient.request(url, options)` quite large. The actual usage of each optional parameter will be shown with descriptions and coding as below.
 
@@ -295,7 +290,7 @@ exports.httpclient = {
     // default enable http KeepAlive
     keepAlive: true,
     // idle KeepAlive socket can survive for 4 seconds
-    freeSocketKeepAliveTimeout: 4000,
+    freeSocketTimeout: 4000,
     // when sockets have no activity for more than 30s, it will be processed as timeout
     timeout: 30000,
     // maximum number of sockets allow to be created
@@ -308,7 +303,7 @@ exports.httpclient = {
     // default enable https KeepAlive
     keepAlive: true,
     // idle KeepAlive socket can survive for 4 seconds
-    freeSocketKeepAliveTimeout: 4000,
+    freeSocketTimeout: 4000,
     // when sockets have no activity for more than 30s, it will be processed as timeout
     timeout: 30000,
     // maximum number of sockets allow to be created
@@ -379,6 +374,36 @@ ctx.curl(url, {
   content: '<xml><hello>world</hello></xml>',
   headers: {
     'content-type': 'text/html',
+  },
+});
+```
+
+### `files: Mixed`
+
+File upload, support: `String | ReadStream | Buffer | Array | Object`.
+
+```js
+ctx.curl(url, {
+  method: 'POST',
+  files: '/path/to/read',
+  data: {
+    foo: 'other fields',
+  },
+});
+```
+
+upload multiple files:
+
+```js
+ctx.curl(url, {
+  method: 'POST',
+  files: {
+    file1: '/path/to/read',
+    file2: fs.createReadStream(__filename),
+    file3: Buffer.from('mock file content'),
+  },
+  data: {
+    foo: 'other fields',
   },
 });
 ```
@@ -651,42 +676,39 @@ These are parameters are passed to the  [HTTPS] modules，details refer to [`htt
 
 ## Debugging Aid
 
-Framework provides [egg-development-proxyagent] plugin to help developers to debug.
-
-Install and enable pulgin:
-
-```bash
-$ npm i egg-development-proxyagent --save
-```
+If you want to debug the httpclient requests, just need to add below code to `config.local.js`:
 
 ```js
-// config/plugin.js
-exports.proxyagent = {
-  enable: true,
-  package: 'egg-development-proxyagent',
+// config.local.js
+module.exports = () => {
+  const config = {};
+
+  // add http_proxy to httpclient
+  if (process.env.http_proxy) {
+    config.httpclient = {
+      request: {
+        enableProxy: true,
+        rejectUnauthorized: false,
+        proxy: process.env.http_proxy,
+      },
+    };
+  }
+
+  return config;
 }
 ```
 
-Open capture tools, we can use [charles] or [fiddler], here we take to [anyproxy] demonstrate
+then open capture tools(such as [charles] or [fiddler]).
 
-```bash
-$ npm install anyproxy -g
-$ anyproxy --port 8888
-```
-
-Starting application using environment variables:
+after that, just start your application by:
 
 ```bash
 $ http_proxy=http://127.0.0.1:8888 npm run dev
 ```
 
-Then it works correctly, and all requests that go through HttpClient can be viewed in the consle of http://localhost:8002.
+Then it works correctly, and all requests that go through HttpClient can be viewed in the capture tools.
 
-![anyproxy](https://cloud.githubusercontent.com/assets/227713/21976937/06a63694-dc0f-11e6-98b5-e9e279c4867c.png)
-
-**Note: the pulgin only start in local environments by defalut**
-
-## Known issues
+## Known Issues
 
 ### Connection Timeout
 
@@ -706,25 +728,25 @@ Then it works correctly, and all requests that go through HttpClient can be view
 - Scene: usually the server actively disconnects the socket connection, causing the HTTP request link exceptions.
 - Troubleshooting Suggestion: please check if server has network exception at that time
 
-### Service is unreachable
+### Service is Unreachable
 
 - Exception: `RequestError, code: ECONNREFUSED, status: -1`
 - Scene: usually because the requested URL which attached IP or the port cannot connect successfully.
 - Troubleshooting Suggestion: make sure the IP or port is set correctly
 
-### Domain name is not existing
+### Domain Name is Not Existing
 
 - Exception: `RequestError, code: ENOTFOUND, status: -1`
 - Scene: usually the domain name requested by URL cannot be resolved by DNS successfully.
 - Troubleshooting Suggestion: make sure the domain name exists, and also check to see if the DNS service is properly configured.
 
-### JSON Response data format error
+### JSON Response Data Format Error
 
 - Exception: `JSONResponseFormatError`
 - scene: the `dataType=json` is set and this exception is thrown in response data that does not match JSON format.
 - Troubleshooting Suggestion: make sure that the server no matter what situations are returns the data in JSON format correctly.
 
-## Global `request` and `response` events
+## Global `request` and `response` Events
 
 In enterprise application scenarios, generally a unified tracer log is needed.
 To facilitate monitoring HttpClient requests and responses on the app level, we agreed on global `request` and `response` to expose these two events.
@@ -745,7 +767,7 @@ To facilitate monitoring HttpClient requests and responses on the app level, we 
        end
 ```
 
-### `request` event occurs before the network operation
+### `request` Event Occurs before the Network Operation
 
 A `request` event is triggered before the request is sent, allowing blocking of the request.
 
@@ -758,7 +780,7 @@ app.httpclient.on('request', req => {
 });
 ```
 
-### `response` event occurs after the end of network operation
+### `response` Event Occurs after the End of Network Operation
 
 After the end of request, a `response` event is triggered, so that the external event can be subscribed to the log printing.
 
@@ -773,14 +795,12 @@ app.httpclient.on('response', result => {
 
 ## Example
 
-Full examples can be found on [eggjs/exmaples/httpclient](https://github.com/eggjs/examples/blob/master/httpclient) .
+Full examples can be found on [eggjs/examples/httpclient](https://github.com/eggjs/examples/blob/master/httpclient) .
 
 [urllib]: https://github.com/node-modules/urllib
 [HttpClient]: https://github.com/eggjs/egg/blob/master/lib/core/httpclient.js
 [formstream]: https://github.com/node-modules/formstream
 [HTTP]: https://nodejs.org/api/http.html
 [HTTPS]: https://nodejs.org/api/https.html
-[egg-development-proxyagent]: https://github.com/eggjs/egg-development-proxyagent
 [charles]: https://www.charlesproxy.com/
 [fiddler]: http://www.telerik.com/fiddler
-[anyproxy]: https://github.com/alibaba/anyproxy

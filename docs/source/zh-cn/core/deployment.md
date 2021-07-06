@@ -51,7 +51,7 @@ $ npm i egg-scripts --save
 
 这样我们就可以通过 `npm start` 和 `npm stop` 命令启动或停止应用。
 
-> 注意：`egg-scripts` 不支持 Windows 系统。
+> 注意：`egg-scripts` 对 Windows 系统的支持有限，参见 [#22](https://github.com/eggjs/egg-scripts/pull/22)。
 
 ### 启动命令
 
@@ -68,7 +68,10 @@ $ egg-scripts start --port=7001 --daemon --title=egg-server-showcase
 - `--title=egg-server-showcase` 用于方便 ps 进程时 grep 用，默认为 `egg-server-${appname}`。
 - `--framework=yadan` 如果应用使用了[自定义框架](../advanced/framework.md)，可以配置 `package.json` 的 `egg.framework` 或指定该参数。
 - `--ignore-stderr` 忽略启动期的报错。
-- 所有 [egg-cluster] 的 Options 都支持透传，如 `--https` 等。
+- `--https.key` 指定 HTTPS 所需密钥文件的完整路径。
+- `--https.cert` 指定 HTTPS 所需证书文件的完整路径。
+
+- 所有 [egg-cluster] 的 Options 都支持透传，如 `--port` 等。
 
 更多参数可查看 [egg-scripts] 和 [egg-cluster] 文档。
 
@@ -82,7 +85,7 @@ $ egg-scripts start --port=7001 --daemon --title=egg-server-showcase
 exports.cluster = {
   listen: {
     port: 7001,
-    hostname: '127.0.0.1',
+    hostname: '127.0.0.1', // 不建议设置 hostname 为 '0.0.0.0'，它将允许来自外部网络和来源的连接，请在知晓风险的情况下使用
     // path: '/var/run/egg.sock',
   }
 }
@@ -102,7 +105,7 @@ $ egg-scripts stop [--title=egg-server]
 支持以下参数：
 - `--title=egg-server` 用于杀死指定的 egg 应用，未传递则会终止所有的 Egg 应用。
 
-你也可以直接通过 `ps -eo "pid,command" | grep "--type=egg-server"` 来找到 master 进程，并 `kill` 掉，无需 `kill -9`。
+你也可以直接通过 `ps -eo "pid,command" | grep -- "--title=egg-server"` 来找到 master 进程，并 `kill` 掉，无需 `kill -9`。
 
 ## 监控
 
@@ -113,6 +116,8 @@ $ egg-scripts stop [--title=egg-server]
 - [NSolid](https://nodesource.com/products/nsolid/)
 
 ### Node.js 性能平台（alinode）
+
+**注意：** Node.js 性能平台 (alinode) 目前仅支持 macOS 和 Linux，不支持 Windows。
 
 [Node.js 性能平台](https://www.aliyun.com/product/nodejs) 是面向所有 Node.js 应用提供 `性能监控、安全提醒、故障排查、性能优化` 等服务的整体性解决方案，提供完善的工具链和服务，协助开发者快速发现和定位线上问题。
 
@@ -175,7 +180,11 @@ exports.alinode = {
 ```bash
 $ [master] node version v8.9.4
 $ [master] alinode version v3.8.4
+$ [Tue Aug 06 2019 15:54:25 GMT+0800 (China Standard Time)] Connecting to wss://agentserver.node.aliyun.com:8080...
+$ [Tue Aug 06 2019 15:54:26 GMT+0800 (China Standard Time)] agent register ok.
 ```
+
+其中 `agent register ok.` 表示配置的 `egg-alinode` 正确连接上了 Node.js 性能平台服务器。
 
 #### 访问控制台
 

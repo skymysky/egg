@@ -91,12 +91,23 @@ module.exports = {
 
     const val = getFromHeaders(this, this.app.config.ipHeaders) || '';
     this[IPS] = val ? val.split(/\s*,\s*/) : [];
+
+    let maxIpsCount = this.app.config.maxIpsCount;
+    // Compatible with maxProxyCount logic (previous logic is wrong, only for compatibility with legacy logic)
+    if (!maxIpsCount && this.app.config.maxProxyCount) maxIpsCount = this.app.config.maxProxyCount + 1;
+
+    if (maxIpsCount > 0) {
+      // if maxIpsCount present, only keep `maxIpsCount` ips
+      // [ illegalIp, clientRealIp, proxyIp1, proxyIp2 ...]
+      this[IPS] = this[IPS].slice(-maxIpsCount);
+    }
     return this[IPS];
   },
 
   /**
-   * Request remote IPv4 address
+   * Get the request remote IPv4 address
    * @member {String} Request#ip
+   * @return {String} IPv4 address
    * @example
    * ```js
    * this.request.ip
@@ -109,15 +120,22 @@ module.exports = {
       return this._ip;
     }
     const ip = this.ips[0] || this.socket.remoteAddress;
-    // will be '::ffff:x.x.x.x', should conver to standard IPv4 format
+    // will be '::ffff:x.x.x.x', should convert to standard IPv4 format
     // https://zh.wikipedia.org/wiki/IPv6
     this._ip = ip && ip.indexOf('::ffff:') > -1 ? ip.substring(7) : ip;
     return this._ip;
   },
 
   /**
-   * Set the remote address
+   * Set the request remote IPv4 address
+   * @member {String} Request#ip
    * @param {String} ip - IPv4 address
+   * @example
+   * ```js
+   * this.request.ip
+   * => '127.0.0.1'
+   * => '111.10.2.1'
+   * ```
    */
   set ip(ip) {
     this._ip = ip;
@@ -142,11 +160,7 @@ module.exports = {
   // How to read query safely
   // https://github.com/koajs/qs/issues/5
   _customQuery(cacheName, filter) {
-    const str = this.querystring;
-    if (!str) {
-      return {};
-    }
-
+    const str = this.querystring || '';
     let c = this[cacheName];
     if (!c) {
       c = this[cacheName] = {};
@@ -156,7 +170,7 @@ module.exports = {
       cacheQuery = c[str] = {};
       const isQueries = cacheName === _queriesCache;
       // `querystring.parse` CANNOT parse something like `a[foo]=1&a[bar]=2`
-      const query = querystring.parse(str);
+      const query = str ? querystring.parse(str) : {};
       for (const key in query) {
         if (!key) {
           // key is '', like `a=b&`
@@ -178,13 +192,13 @@ module.exports = {
   },
 
   /**
-   * get params pass by querystring, all value are String type.
+   * get params pass by querystring, all values are of string type.
    * @member {Object} Request#query
    * @example
    * ```js
    * GET http://127.0.0.1:7001?name=Foo&age=20&age=21
    * this.query
-   * => { 'name': 'Foo', 'age': 20 }
+   * => { 'name': 'Foo', 'age': '20' }
    *
    * GET http://127.0.0.1:7001?a=b&a=c&o[foo]=bar&b[]=1&b[]=2&e=val
    * this.query
@@ -233,10 +247,9 @@ module.exports = {
   /**
    * Set query-string as an object.
    *
-   * @method Request#query
+   * @function Request#query
    * @param {Object} obj set querystring and query object for request.
    * @return {void}
-   * @api public
    */
   set query(obj) {
     this.querystring = querystring.stringify(obj);

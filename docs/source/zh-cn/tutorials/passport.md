@@ -162,6 +162,9 @@ module.exports = app => {
   - `options.callbackURL` - 授权后回调地址，默认为 `/passport/${strategy}/callback`
 - `app.passport.mount(strategy, options)` - 语法糖，方便开发者配置路由
 
+**注意：**
+ - `app.passport.authenticate` 中，未设置 `options.successRedirect` 或者 `options.successReturnToOrRedirect` 将默认跳转 `/`
+
 ## 使用 Passport 生态
 
 [Passport] 的中间件很多，不可能都进行二次封装。
@@ -227,7 +230,7 @@ module.exports = app => {
 **初始化：**
 
 ```bash
-$ egg-init --type=plugin egg-passport-local
+$ npm init egg --type=plugin egg-passport-local
 ```
 
 在 `package.json` 中**配置依赖：**

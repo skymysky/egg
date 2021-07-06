@@ -4,10 +4,11 @@ const mm = require('egg-mock');
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
-const sleep = require('mz-modules/sleep');
+const { rimraf, sleep } = require('mz-modules');
 const spy = require('spy');
 const Transport = require('egg-logger').Transport;
 const utils = require('../utils');
+const assertFile = require('assert-file');
 
 describe('test/lib/egg.test.js', () => {
   afterEach(mm.restore);
@@ -27,9 +28,17 @@ describe('test/lib/egg.test.js', () => {
       assert(json.config.name === 'demo');
       assert(json.config.tips === 'hello egg');
       json = require(path.join(baseDir, 'run/application_config.json'));
-      assert(/\d+\.\d+\.\d+/.test(json.plugins.onerror.version));
-      // should dump dynamic config
-      assert(json.config.tips === 'hello egg started');
+      checkApp(json);
+
+      const dumpped = app.dumpConfigToObject();
+      checkApp(dumpped.config);
+
+      function checkApp(json) {
+        assert(/\d+\.\d+\.\d+/.test(json.plugins.onerror.version));
+        assert(json.config.name === 'demo');
+        // should dump dynamic config
+        assert(json.config.tips === 'hello egg started');
+      }
     });
 
     it('should dump router json', () => {
@@ -52,35 +61,50 @@ describe('test/lib/egg.test.js', () => {
       let json = require(path.join(baseDir, 'run/agent_config_meta.json'));
       assert(json.name === path.join(__dirname, '../../config/config.default.js'));
       assert(json.buffer === path.join(baseDir, 'config/config.default.js'));
+
       json = require(path.join(baseDir, 'run/application_config_meta.json'));
-      assert(json.name === path.join(__dirname, '../../config/config.default.js'));
-      assert(json.buffer === path.join(baseDir, 'config/config.default.js'));
+      checkApp(json);
+
+      const dumpped = app.dumpConfigToObject();
+      checkApp(dumpped.meta);
+
+      function checkApp(json) {
+        assert(json.name === path.join(__dirname, '../../config/config.default.js'));
+        assert(json.buffer === path.join(baseDir, 'config/config.default.js'));
+      }
     });
 
     it('should ignore some type', () => {
       const json = require(path.join(baseDir, 'run/application_config.json'));
-      assert(json.config.mysql.accessId === 'this is accessId');
+      checkApp(json);
 
-      assert(json.config.name === 'demo');
-      assert(json.config.keys === '<String len: 3>');
-      assert(json.config.buffer === '<Buffer len: 4>');
-      assert(json.config.siteFile['/favicon.ico'].startsWith('<Buffer len:'));
+      const dumpped = app.dumpConfigToObject();
+      checkApp(dumpped.config);
 
-      assert(json.config.pass === '<String len: 12>');
-      assert(json.config.pwd === '<String len: 11>');
-      assert(json.config.password === '<String len: 16>');
-      assert(json.config.passwordNew === 'this is passwordNew');
-      assert(json.config.mysql.passd === '<String len: 13>');
-      assert(json.config.mysql.passwd === '<String len: 14>');
-      assert(json.config.mysql.secret === '<String len: 10>');
-      assert(json.config.mysql.secretNumber === '<Number>');
-      assert(json.config.mysql.masterKey === '<String len: 17>');
-      assert(json.config.mysql.accessKey === '<String len: 17>');
-      assert(json.config.mysql.consumerSecret === '<String len: 22>');
-      assert(json.config.mysql.someSecret === null);
+      function checkApp(json) {
+        assert(json.config.mysql.accessId === 'this is accessId');
 
-      // don't change config
-      assert(app.config.keys === 'foo');
+        assert(json.config.name === 'demo');
+        assert(json.config.keys === '<String len: 3>');
+        assert(json.config.buffer === '<Buffer len: 4>');
+        assert(json.config.siteFile['/favicon.ico'].startsWith('<Buffer len:'));
+
+        assert(json.config.pass === '<String len: 12>');
+        assert(json.config.pwd === '<String len: 11>');
+        assert(json.config.password === '<String len: 16>');
+        assert(json.config.passwordNew === 'this is passwordNew');
+        assert(json.config.mysql.passd === '<String len: 13>');
+        assert(json.config.mysql.passwd === '<String len: 14>');
+        assert(json.config.mysql.secret === '<String len: 10>');
+        assert(json.config.mysql.secretNumber === '<Number>');
+        assert(json.config.mysql.masterKey === '<String len: 17>');
+        assert(json.config.mysql.accessKey === '<String len: 17>');
+        assert(json.config.mysql.consumerSecret === '<String len: 22>');
+        assert(json.config.mysql.someSecret === null);
+
+        // don't change config
+        assert(app.config.keys === 'foo');
+      }
     });
 
     it('should console.log call inspect()', () => {
@@ -109,6 +133,53 @@ describe('test/lib/egg.test.js', () => {
       assert(/\[egg:core] dump config after load, \d+ms/.test(content));
       assert(/\[egg:core] dump config after ready, \d+ms/.test(content));
     });
+
+    it('should read timing data', function* () {
+      let json = readJson(path.join(baseDir, `run/agent_timing_${process.pid}.json`));
+      assert(json.length === 41);
+      assert(json[1].name === 'Application Start');
+      assert(json[0].pid === process.pid);
+
+      json = readJson(path.join(baseDir, `run/application_timing_${process.pid}.json`));
+      assert(json.length === 63);
+      assert(json[1].name === 'Application Start');
+      assert(json[0].pid === process.pid);
+    });
+
+    it('should disable timing after ready', function* () {
+      const json = app.timing.toJSON();
+      const last = json[json.length - 1];
+      app.timing.start('a');
+      app.timing.end('a');
+      const json2 = app.timing.toJSON();
+      assert(json2[json.length - 1].name === last.name);
+    });
+
+    it('should ignore error when dumpTiming', done => {
+      mm(fs, 'writeFileSync', () => {
+        throw new Error('mock error');
+      });
+      mm(app.coreLogger, 'warn', msg => {
+        assert(msg === 'dumpTiming error: mock error');
+        done();
+      });
+      app.dumpTiming();
+    });
+  });
+
+  describe('dump disabled plugin', () => {
+    let app;
+    before(async () => {
+      app = utils.app('apps/dumpconfig');
+      await app.ready();
+    });
+    after(() => app.close());
+
+    it('should works', async () => {
+      const baseDir = utils.getFilepath('apps/dumpconfig');
+      const json = readJson(path.join(baseDir, 'run/application_config.json'));
+      assert(!json.plugins.static.enable);
+    });
   });
 
   describe('dumpConfig() dynamically', () => {
@@ -122,15 +193,8 @@ describe('test/lib/egg.test.js', () => {
       const baseDir = utils.getFilepath('apps/dumpconfig');
       let json;
 
-      await sleep(100);
-      json = readJson(path.join(baseDir, 'run/application_config.json'));
-      assert(json.config.dynamic === 1);
-      json = readJson(path.join(baseDir, 'run/agent_config.json'));
-      assert(json.config.dynamic === 0);
-
       await app.ready();
 
-      await sleep(100);
       json = readJson(path.join(baseDir, 'run/application_config.json'));
       assert(json.config.dynamic === 2);
       json = readJson(path.join(baseDir, 'run/agent_config.json'));
@@ -168,6 +232,43 @@ describe('test/lib/egg.test.js', () => {
     it('should ignore config', () => {
       const json = require(path.join(baseDir, 'run/application_config.json'));
       assert(json.config.keys === 'test key');
+    });
+  });
+
+  describe('custom config from env', () => {
+    let app;
+    let baseDir;
+    let runDir;
+    let logDir;
+    before(async () => {
+      baseDir = utils.getFilepath('apps/config-env');
+      runDir = path.join(baseDir, 'custom_rundir');
+      logDir = path.join(baseDir, 'custom_logdir');
+      await rimraf(runDir);
+      await rimraf(logDir);
+      await rimraf(path.join(baseDir, 'run'));
+      await rimraf(path.join(baseDir, 'logs'));
+      mm(process.env, 'EGG_APP_CONFIG', JSON.stringify({
+        logger: {
+          dir: logDir,
+        },
+        rundir: runDir,
+      }));
+
+      app = utils.app('apps/config-env');
+      await app.ready();
+    });
+    after(async () => {
+      await app.close();
+      await rimraf(runDir);
+      await rimraf(logDir);
+    });
+    afterEach(mm.restore);
+
+    it('should custom dir', async () => {
+      assertFile(path.join(runDir, 'application_config.json'));
+      assertFile(path.join(logDir, 'egg-web.log'));
+      assertFile.fail(path.join(baseDir, 'run/application_config.json'));
     });
   });
 
@@ -226,7 +327,7 @@ describe('test/lib/egg.test.js', () => {
     after(() => app.close());
 
     // use it to record create coverage codes time
-    it('before: should cluster app ready', () => {
+    before('before: should cluster app ready', () => {
       app = utils.cluster('apps/app-throw');
       app.coverage(true);
       return app.ready();
@@ -297,6 +398,43 @@ describe('test/lib/egg.test.js', () => {
         .get('/config')
         .expect('base-context-class')
         .expect(200);
+    });
+  });
+
+  describe.skip('egg-ready', () => {
+    let app;
+    before(() => {
+      app = utils.app('apps/demo');
+    });
+    after(() => app.close());
+
+    it('should only trigger once', async () => {
+      let triggerCount = 0;
+      mm(app.lifecycle, 'triggerServerDidReady', () => {
+        triggerCount++;
+      });
+      await app.ready();
+      app.messenger.emit('egg-ready');
+      app.messenger.emit('egg-ready');
+      app.messenger.emit('egg-ready');
+      assert(triggerCount === 1);
+    });
+  });
+
+  describe('createAnonymousContext()', () => {
+    let app;
+    before(() => {
+      app = utils.app('apps/demo');
+      return app.ready();
+    });
+    after(() => app.close());
+
+    it('should create anonymous context', async () => {
+      let ctx = app.createAnonymousContext();
+      assert(ctx);
+      assert(ctx.host === '127.0.0.1');
+      ctx = app.agent.createAnonymousContext();
+      assert(ctx);
     });
   });
 });

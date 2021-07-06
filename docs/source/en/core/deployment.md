@@ -50,7 +50,7 @@ Then add `npm scripts` to `package.json`:
 
 Then we are able to use `npm start` and `npm stop` to manage application.
 
-> Note: `egg-scripts` don't support Windows.
+> Note: `egg-scripts` has limited support for Windows, see [#22](https://github.com/eggjs/egg-scripts/pull/22).
 
 ### Start
 
@@ -67,11 +67,13 @@ Options:
 - `--title=egg-server-showcase` convenient for `ps + grep`, default to `egg-server-${appname}`.
 - `--framework=yadan` config `egg.framework` at `package.json` or pass this args, when you are using [Custom Framework](../advanced/framework.md).
 - `--ignore-stderr` ignore the std err at start up。
-- support all options from [egg-cluster], such as `--https`.
+- `--https.key` specify the https key full path, if start the server with https.
+- `--https.cert` specify the https certificate full path, if start the server with https.
+- support all options from [egg-cluster], such as `--port`.
 
 More about [egg-scripts] and [egg-cluster] documents.
 
-#### Dispatch with arguments
+#### Dispatch with Arguments
 
 Arguments of dispatch can be configured in `config.{env}.js`.
 
@@ -81,7 +83,7 @@ Arguments of dispatch can be configured in `config.{env}.js`.
 exports.cluster = {
   listen: {
     port: 7001,
-    hostname: '127.0.0.1',
+    hostname: '127.0.0.1', // It is not recommended to set the hostname to '0.0.0.0', which will allow connections from external networks and sources, please use it if you know the risk.
     // path: '/var/run/egg.sock',
   }
 }
@@ -97,7 +99,7 @@ $ egg-scripts stop
 
 This command will kill master process which will handler and notice worker and agent to gracefull exit.
 
-Also you can manually call `ps -eo "pid,command" | grep "--type=egg-server"` to find master process then `kill` without `-9`.
+Also you can manually call `ps -eo "pid,command" | grep -- "--title=egg-server"` to find master process then `kill` without `-9`.
 
 [egg-cluster]: https://github.com/eggjs/egg-cluster
 [egg-scripts]: https://github.com/eggjs/egg-scripts
